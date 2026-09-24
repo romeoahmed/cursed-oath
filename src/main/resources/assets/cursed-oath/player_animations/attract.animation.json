@@ -1,0 +1,49 @@
+{
+	"format_version": "1.8.0",
+	"animations": {
+		"attract": {
+			"loop": "hold_on_last_frame",
+			"animation_length": 1.0,
+			"bones": {
+				"right_arm": {
+					"rotation": {
+						"0.0": [
+							0,
+							0,
+							0
+						],
+						"0.12": [
+							-85,
+							-15,
+							-20
+						],
+						"1.0": [
+							-85,
+							-15,
+							-20
+						]
+					}
+				},
+				"left_arm": {
+					"rotation": {
+						"0.0": [
+							0,
+							0,
+							0
+						],
+						"0.12": [
+							-15,
+							0,
+							5
+						],
+						"1.0": [
+							-15,
+							0,
+							5
+						]
+					}
+				}
+			}
+		}
+	}
+}

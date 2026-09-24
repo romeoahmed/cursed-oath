@@ -1,0 +1,35 @@
+{
+	"schemaVersion": 1,
+	"id": "cursed-oath",
+	"version": "${version}",
+	"name": "Cursed Oath",
+	"description": "Jujutsu combat in Minecraft. Development prototype.",
+	"license": "MPL-2.0",
+	"icon": "assets/cursed-oath/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			{
+				"value": "io.github.romeoahmed.cursedoath.CursedOath",
+				"adapter": "kotlin"
+			}
+		],
+		"client": [
+			{
+				"value": "io.github.romeoahmed.cursedoath.client.CursedOathClient",
+				"adapter": "kotlin"
+			}
+		]
+	},
+	"mixins": [
+		"cursed-oath.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=${loader_version}",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": ">=${fabric_api_version}",
+		"fabric-language-kotlin": ">=${fabric_kotlin_version}",
+		"player_animation_library": "=1.2.7+mc.26.3"
+	}
+}

@@ -1,0 +1,29 @@
+# Build output and caches
+.gradle/
+.kotlin/
+build/
+out/
+classes/
+
+# IDE metadata
+*.launch
+.idea/
+*.iml
+*.ipr
+*.iws
+.settings/
+.vscode/
+bin/
+.classpath
+.project
+
+# Development worlds and diagnostics
+run/
+logs/
+hs_err_*.log
+replay_*.log
+*.hprof
+*.jfr
+
+# macOS metadata
+*.DS_Store

@@ -1,0 +1,8 @@
+config:
+  warningsAsErrors: true
+
+style:
+  ReturnCount:
+    excludeGuardClauses: true
+  MagicNumber:
+    ignoreEnums: true
