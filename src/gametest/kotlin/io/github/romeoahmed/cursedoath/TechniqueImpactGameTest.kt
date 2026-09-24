@@ -1,9 +1,9 @@
 package io.github.romeoahmed.cursedoath
 
-import io.github.romeoahmed.cursedoath.technique.BlueFields
 import io.github.romeoahmed.cursedoath.technique.RedBlast
 import io.github.romeoahmed.cursedoath.technique.Technique
 import io.github.romeoahmed.cursedoath.technique.TechniqueCombat
+import io.github.romeoahmed.cursedoath.technique.TechniqueProjectiles
 import io.github.romeoahmed.cursedoath.technique.TechniqueTuning
 import io.github.romeoahmed.cursedoath.world.TerrainDestruction
 import net.fabricmc.fabric.api.gametest.v1.GameTest
@@ -16,21 +16,6 @@ import net.minecraft.world.phys.Vec3
 import java.util.UUID
 
 class TechniqueImpactGameTest {
-    @GameTest(environment = "cursed-oath-test:power", structure = "cursed-oath-test:arena")
-    fun blueFieldDoesNotUseAReplacementPlayerWithTheSameUuid(helper: GameTestHelper) {
-        val player = helper.caster()
-        val target = helper.stationaryTarget(EntityTypes.VILLAGER, TARGET)
-        BlueFields.create(player, target.boundingBox.center)
-        player.discard()
-        val replacement = helper.caster().apply { uuid = player.uuid }
-        helper.level.addNewPlayer(replacement)
-        helper.runAfterDelay(2) {
-            replacement.discard()
-            helper.assertTrue(target.health == target.maxHealth, "The retired caster's field must not deal damage")
-            helper.succeed()
-        }
-    }
-
     @GameTest(environment = "cursed-oath-test:power", structure = "cursed-oath-test:arena", maxTicks = 100)
     fun blueDeliversItsCompleteCompressionOutput(helper: GameTestHelper) {
         val player = helper.caster().apply { setPos(helper.absoluteVec(ORIGIN)) }
@@ -38,9 +23,13 @@ class TechniqueImpactGameTest {
         val target = helper.stationaryTarget(EntityTypes.VILLAGER, TARGET)
         checkNotNull(target.getAttribute(Attributes.MAX_HEALTH)).baseValue = HEALTH.toDouble()
         target.health = HEALTH
-        BlueFields.create(player, target.boundingBox.center)
+        TechniqueCombat.release(player, UUID.randomUUID(), Technique.BLUE)
+        val orb = helper.level.getEntities(TechniqueProjectiles.ORB) { it.getOwner() === player }.single()
+        orb.setPos(target.boundingBox.center)
+        orb.deltaMovement = Vec3.ZERO
         helper.runAfterDelay(TechniqueTuning.BLUE_DURATION.toLong() + 1) {
             player.discard()
+            helper.assertTrue(orb.isRemoved, "The visible core must expire with its attraction")
             helper.assertTrue(
                 target.health == HEALTH - TechniqueTuning.BLUE_OUTPUT,
                 "Blue must deliver six core pulses",
@@ -77,7 +66,6 @@ class TechniqueImpactGameTest {
         TechniqueCombat.release(player, UUID.randomUUID(), Technique.CLEAVE, work)
         helper.succeedWhen {
             helper.assertTrue(work.finished, "Cleave terrain work must settle")
-            helper.assertTrue(!work.blocked, "Ordinary stone must not stop Cleave")
             val contact = BlockPos(14, 11, 11)
             helper.assertBlockPresent(Blocks.AIR, contact)
             val removed = wall.count { helper.getBlockState(it).isAir }

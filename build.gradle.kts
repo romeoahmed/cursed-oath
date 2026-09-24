@@ -1,4 +1,5 @@
 import dev.detekt.gradle.extensions.FailOnSeverity
+import java.time.Duration
 
 plugins {
     id("net.fabricmc.fabric-loom")
@@ -32,6 +33,10 @@ fabricApi {
         modId = "cursed-oath-test"
         eula = true
     }
+}
+
+loom.runs.named("clientGameTest") {
+    programArguments.addAll("--graphicsBackend", "vulkan")
 }
 
 dependencies {
@@ -135,4 +140,18 @@ tasks.jar {
     from("LICENSE") {
         rename { "${it}_$projectName" }
     }
+}
+
+// Fail before Minecraft opens its blocking backend-error dialog on headless runners.
+val checkClientGraphics =
+    tasks.register<JavaExec>("checkClientGraphics") {
+        classpath = sourceSets["gametest"].runtimeClasspath
+        mainClass = "io.github.romeoahmed.cursedoath.client.GraphicsProbeKt"
+        timeout = Duration.ofSeconds(30)
+        jvmArgs("--enable-native-access=ALL-UNNAMED")
+        if (System.getProperty("os.name").startsWith("Mac")) jvmArgs("-XstartOnFirstThread")
+    }
+
+tasks.named("runClientGameTest") {
+    dependsOn(checkClientGraphics)
 }

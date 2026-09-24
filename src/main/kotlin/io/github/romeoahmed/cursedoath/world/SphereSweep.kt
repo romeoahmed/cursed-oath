@@ -10,34 +10,41 @@ internal class SphereSweep(
     private val start: Vec3,
     end: Vec3,
     radius: Double,
-    private val box: AABB,
 ) {
     private val path = AABB(start, end)
     private val motion = end.subtract(start)
     private val radiusSquared = radius * radius
 
-    fun entry(): Double? {
+    fun entry(box: AABB): Double? {
         if (box.distanceToSqr(path) > radiusSquared) return null
         if (box.distanceToSqr(start) <= radiusSquared) return 0.0
-        val times = crossings()
-        return (0 until times.lastIndex).firstNotNullOfOrNull { contact(times[it], times[it + 1]) }
+        val times = crossings(box)
+        return (0 until times.lastIndex).firstNotNullOfOrNull { contact(box, times[it], times[it + 1]) }
     }
 
-    private fun crossings(): List<Double> {
-        val times = mutableListOf(0.0, 1.0)
+    private fun crossings(box: AABB): DoubleArray {
+        val times = DoubleArray(MAX_CROSSINGS) { 1.0 }
+        times[0] = 0.0
+        var count = 2
         for (axis in Direction.Axis.entries) {
             val speed = motion.get(axis)
             if (speed == 0.0) continue
-            for (face in listOf(box.min(axis), box.max(axis))) {
+            for (side in 0..1) {
+                val face = if (side == 0) box.min(axis) else box.max(axis)
                 val time = (face - start.get(axis)) / speed
-                if (time > 0.0 && time < 1.0) times.add(time)
+                if (time > 0.0 && time < 1.0) times[count++] = time
             }
         }
         times.sort()
         return times
     }
 
+    private companion object {
+        const val MAX_CROSSINGS = 8
+    }
+
     private fun contact(
+        box: AABB,
         low: Double,
         high: Double,
     ): Double? {

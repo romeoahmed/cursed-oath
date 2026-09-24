@@ -19,8 +19,9 @@ Use JDK 25 and the wrapper; substitute `gradlew.bat` on Windows.
 - `./gradlew genSources`: generate Minecraft sources; inspect actual targets before changing mixins or version-sensitive API calls.
 - `./gradlew spotlessApply`: apply ktlint, default Palantir Java Format, and text whitespace rules.
 - `./gradlew build`: compile, run unit/server tests, check formatting, Detekt, and scoped coverage, then package JARs.
-- `./gradlew runClientGameTest`: run client checks after `build`; requires a graphics session. Inspect `build/run/clientGameTest/screenshots/` for visual changes. Later server-test cleanup can delete these outputs.
+- `./gradlew runClientGameTest`: run Vulkan client checks after `build`; requires a graphics session. Automatically runs the graphics preflight and rejects backend fallback. Inspect `build/run/clientGameTest/screenshots/` for visual changes. Later server-test cleanup can delete these outputs.
 - `./gradlew runClient` / `runServer`: launch development environments.
+- `./gradlew checkClientGraphics`: independently check Minecraft's Vulkan device and presentation surface with a 30-second timeout.
 
 For focused work, use `./gradlew test --tests '*ClassName'` or `./gradlew runGameTest`. Documentation-only changes need formatting and link checks. Report checks actually performed; screenshot assertions establish presence and expiry, not visual quality.
 

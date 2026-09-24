@@ -28,10 +28,7 @@ object CombatInput {
 
     fun initialize() {
         ClientPlayNetworking.registerGlobalReceiver(CombatSnapshot.TYPE) { packet, _ ->
-            if (snapshot?.session != packet.session) {
-                sequence = 0
-                TechniqueVisuals.clear()
-            }
+            if (snapshot?.session != packet.session) sequence = 0
             snapshot = packet
         }
         ClientPlayNetworking.registerGlobalReceiver(TechniqueEvent.TYPE) { packet, _ ->

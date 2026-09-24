@@ -12,9 +12,10 @@ object TechniqueTuning {
     const val RED_DAMAGE = BLUE_OUTPUT * 2
     const val RED_RADIUS = 10.0
     const val RED_EXCAVATION = 8.0
-    const val PURPLE_DAMAGE = 240f
+    const val PURPLE_DAMAGE = 360f
     const val PURPLE_RADIUS = 6.0
-    const val PURPLE_RANGE = 96.0
+    const val PURPLE_RANGE = 128.0
+    const val PURPLE_SPEED = 4.0
     const val DISMANTLE_DAMAGE = 36f
     const val DISMANTLE_WIDTH = 5.0
     const val DISMANTLE_RANGE = 48.0

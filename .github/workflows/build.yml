@@ -1,30 +1,39 @@
 name: build
 on: [pull_request, push]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-26.04
+    timeout-minutes: 20
     steps:
       - name: checkout repository
         uses: actions/checkout@v7
-      - name: validate gradle wrapper
-        uses: gradle/actions/wrapper-validation@v6
+        with:
+          persist-credentials: false
       - name: setup jdk
         uses: actions/setup-java@v6
         with:
           java-version: '25'
           distribution: 'microsoft'
-      - name: make gradle wrapper executable
-        run: chmod +x ./gradlew
+      - name: setup gradle
+        uses: gradle/actions/setup-gradle@v6
       - name: build
         run: ./gradlew build
-      - name: install virtual display
-        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri libglx-mesa0
-      - name: client game tests
+      - name: install Vulkan runtime
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb xauth mesa-vulkan-drivers
+      - name: Vulkan client game tests
         timeout-minutes: 10
         env:
-          LIBGL_ALWAYS_SOFTWARE: 'true'
-        run: xvfb-run -a ./gradlew runClientGameTest
+          SDL_VIDEO_DRIVER: x11
+          VK_DRIVER_FILES: /usr/share/vulkan/icd.d/lvp_icd.json
+        run: xvfb-run -a -s "-screen 0 1280x1024x24" ./gradlew runClientGameTest
       - name: capture verification reports
         if: always()
         uses: actions/upload-artifact@v7
@@ -42,3 +51,5 @@ jobs:
         with:
           name: Artifacts
           path: build/libs/
+          if-no-files-found: error
+          compression-level: 0

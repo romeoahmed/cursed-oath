@@ -6,7 +6,7 @@ import io.github.romeoahmed.cursedoath.network.RequestGate
 import io.github.romeoahmed.cursedoath.network.TechniqueEvent
 import io.github.romeoahmed.cursedoath.technique.InfinityDefense
 import io.github.romeoahmed.cursedoath.technique.Technique
-import io.github.romeoahmed.cursedoath.technique.TechniqueCombat
+import io.github.romeoahmed.cursedoath.world.TerrainDestruction
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityLevelChangeEvents
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents
@@ -25,6 +25,7 @@ object CombatRuntime {
 
     private val worlds = IdentityHashMap<ServerLevel, MutableMap<UUID, Fighter>>()
     private val connections = mutableMapOf<UUID, RequestGate>()
+    private val snapshots = mutableMapOf<UUID, CombatSnapshot>()
 
     fun initialize() {
         SorcererData.initialize()
@@ -54,8 +55,14 @@ object CombatRuntime {
                 }
             }
         }
-        ServerPlayerEvents.AFTER_RESPAWN.register { _, player, _ -> sync(fighter(player)) }
-        ServerEntityLevelChangeEvents.AFTER_PLAYER_CHANGE_LEVEL.register { player, _, _ -> sync(fighter(player)) }
+        ServerPlayerEvents.AFTER_RESPAWN.register { _, player, _ ->
+            snapshots.remove(player.uuid)
+            sync(fighter(player))
+        }
+        ServerEntityLevelChangeEvents.AFTER_PLAYER_CHANGE_LEVEL.register { player, _, _ ->
+            snapshots.remove(player.uuid)
+            sync(fighter(player))
+        }
         ServerLivingEntityEvents.ALLOW_DAMAGE.register { entity, source, _ ->
             val player = entity as? ServerPlayer
             player == null || !InfinityDefense.blocks(player, source)
@@ -64,7 +71,8 @@ object CombatRuntime {
         ServerLifecycleEvents.SERVER_STOPPED.register {
             worlds.clear()
             connections.clear()
-            TechniqueCombat.clear()
+            snapshots.clear()
+            TerrainDestruction.clear()
         }
     }
 
@@ -130,6 +138,7 @@ object CombatRuntime {
     fun consumePulse(player: ServerPlayer): Boolean = worlds[player.level()]?.get(player.uuid)?.consumePulse() == true
 
     private fun remove(player: ServerPlayer) {
+        snapshots.remove(player.uuid)
         for (fighters in worlds.values) fighters.remove(player.uuid)?.cancel()
     }
 
@@ -137,8 +146,7 @@ object CombatRuntime {
         val player = fighter.player
         val gate = connections[player.uuid] ?: return
         if (!ServerPlayNetworking.canSend(player, CombatSnapshot.TYPE)) return
-        ServerPlayNetworking.send(
-            player,
+        val snapshot =
             CombatSnapshot(
                 gate.session,
                 player.getAttachedOrCreate(SorcererData.PROFILE).practice,
@@ -148,7 +156,7 @@ object CombatRuntime {
                 fighter.cast?.technique?.wireId ?: 0,
                 fighter.infinity,
                 fighter.pulseReady,
-            ),
-        )
+            )
+        if (snapshots.put(player.uuid, snapshot) != snapshot) ServerPlayNetworking.send(player, snapshot)
     }
 }

@@ -14,8 +14,9 @@ internal class TechniqueGeometry(
     pose: PoseStack.Pose,
     vertices: VertexConsumer,
     opacity: Float = 1f,
+    private val detail: Int = 1,
 ) {
-    private val mesh = TechniqueMesh(pose, vertices, opacity)
+    private val mesh = TechniqueMesh(pose, vertices, opacity, detail)
 
     fun draw(
         technique: Technique,
@@ -110,21 +111,19 @@ internal class TechniqueGeometry(
         val fade = minOf(1f, (1 - progress) * FADE_SPEED)
         val axes = TechniqueMesh.basis(direction)
         mesh.ring(Vec3.ZERO, axes, BLUE_CORE, Technique.BLUE.color, fade)
-        for (arm in 0..<ARMS) {
+        for (arm in 0..<ARMS step detail) {
             val phase = (age * INFALL_SPEED + arm.toDouble() / ARMS) % 1.0
             val radius = BLUE_CORE + (1 - phase) * TechniqueTuning.BLUE_EXCAVATION
             val angle = arm * 2 * PI / ARMS + age * ORBIT_SPEED
-            val points =
-                Array(POINTS) { i ->
-                    val t = i.toDouble() / (POINTS - 1)
-                    val r = radius * (1 - t) + BLUE_CORE * t
-                    val turn = angle + t * PI
-                    axes.first
-                        .scale(cos(turn) * r)
-                        .add(axes.second.scale(sin(turn) * r))
-                        .add(direction.scale(sin(t * PI) * (1 - t)))
-                }
-            mesh.ribbon(points, axes.second.scale(TRAIL_WIDTH), Technique.BLUE.color, fade * TRAIL_ALPHA)
+            mesh.ribbon(POINTS, axes.second.scale(TRAIL_WIDTH), Technique.BLUE.color, fade * TRAIL_ALPHA) { i ->
+                val t = i.toDouble() / (POINTS - 1)
+                val r = radius * (1 - t) + BLUE_CORE * t
+                val turn = angle + t * PI
+                axes.first
+                    .scale(cos(turn) * r)
+                    .add(axes.second.scale(sin(turn) * r))
+                    .add(direction.scale(sin(t * PI) * (1 - t)))
+            }
         }
         for (layer in 0..<LAYERS) {
             val phase = (age * INFALL_SPEED + layer.toDouble() / LAYERS) % 1.0
@@ -164,7 +163,7 @@ internal class TechniqueGeometry(
     ) {
         val (side, up) = TechniqueMesh.basis(direction)
         mesh.sphere(Vec3.ZERO, PURPLE_CORE, Technique.PURPLE.color, TRAIL_ALPHA)
-        for (i in 0..<ARMS) {
+        for (i in 0..<ARMS step detail) {
             val latitude = (i + 0.5) * PI / ARMS
             val longitude = i * GOLDEN_ANGLE + age * ORBIT_SPEED
             val normal =
@@ -173,13 +172,11 @@ internal class TechniqueGeometry(
                     .add(up.scale(cos(latitude)))
                     .add(direction.scale(sin(longitude) * sin(latitude)))
             val (across, along) = TechniqueMesh.basis(normal)
-            val points =
-                Array(POINTS) { j ->
-                    val angle = j.toDouble() / (POINTS - 1) * ARC_LENGTH + age * ORBIT_SPEED
-                    val radius = TechniqueTuning.PURPLE_RADIUS + sin(j * RIPPLE_FREQUENCY + age) * RIPPLE_SIZE
-                    across.scale(cos(angle) * radius).add(along.scale(sin(angle) * radius))
-                }
-            mesh.ribbon(points, normal.scale(TRAIL_WIDTH), Technique.PURPLE.color, TRAIL_ALPHA)
+            mesh.ribbon(POINTS, normal.scale(TRAIL_WIDTH), Technique.PURPLE.color, TRAIL_ALPHA) { j ->
+                val angle = j.toDouble() / (POINTS - 1) * ARC_LENGTH + age * ORBIT_SPEED
+                val radius = TechniqueTuning.PURPLE_RADIUS + sin(j * RIPPLE_FREQUENCY + age) * RIPPLE_SIZE
+                across.scale(cos(angle) * radius).add(along.scale(sin(angle) * radius))
+            }
         }
         for (i in 1..LAYERS) {
             mesh.ring(
@@ -192,34 +189,37 @@ internal class TechniqueGeometry(
         }
     }
 
-    private companion object {
-        const val GOLDEN_ANGLE = 2.4
-        const val ARC_LENGTH = 1.7
-        const val RIPPLE_FREQUENCY = 1.3
-        const val RIPPLE_SIZE = 0.12
-        const val POINTS = 17
-        const val ARMS = 8
-        const val LAYERS = 3
-        const val CORE_INSET = 0.92
-        const val BLUE_DARK = 0x02091B
-        const val RED_DARK = 0xBA050B
-        const val PURPLE_DARK = 0x290345
-        const val WHITE = 0xF4EAFF
-        const val CYAN = 0x66DDFF
-        const val CORE_RADIUS = 0.6
-        const val BLUE_CORE = 1.35
-        const val CHARGE_RADIUS = 0.4
-        const val CHARGE_SEPARATION = 2.2
-        const val CHARGE_ARC = 0.65
-        const val FUSION_GROWTH = 1.4
-        const val FUSION_RING = 4.0
-        const val FADE_SPEED = 6
-        const val ORBIT_SPEED = 0.08
-        const val INFALL_SPEED = 0.055
-        const val TRAIL_WIDTH = 0.1
-        const val TRAIL_ALPHA = 0.65f
-        const val PURPLE_CORE = 4.0
-        const val RAY_STRETCH = 1.5
-        const val TAIL_SPACING = 2.5
+    companion object {
+        fun detail(distanceSquared: Double): Int = if (distanceSquared > DETAIL_DISTANCE_SQUARED) 2 else 1
+
+        private const val DETAIL_DISTANCE_SQUARED = 48.0 * 48.0
+        private const val GOLDEN_ANGLE = 2.4
+        private const val ARC_LENGTH = 1.7
+        private const val RIPPLE_FREQUENCY = 1.3
+        private const val RIPPLE_SIZE = 0.12
+        private const val POINTS = 17
+        private const val ARMS = 8
+        private const val LAYERS = 3
+        private const val CORE_INSET = 0.92
+        private const val BLUE_DARK = 0x02091B
+        private const val RED_DARK = 0xBA050B
+        private const val PURPLE_DARK = 0x290345
+        private const val WHITE = 0xF4EAFF
+        private const val CYAN = 0x66DDFF
+        private const val CORE_RADIUS = 0.6
+        private const val BLUE_CORE = 1.35
+        private const val CHARGE_RADIUS = 0.4
+        private const val CHARGE_SEPARATION = 2.2
+        private const val CHARGE_ARC = 0.65
+        private const val FUSION_GROWTH = 1.4
+        private const val FUSION_RING = 4.0
+        private const val FADE_SPEED = 6
+        private const val ORBIT_SPEED = 0.08
+        private const val INFALL_SPEED = 0.055
+        private const val TRAIL_WIDTH = 0.1
+        private const val TRAIL_ALPHA = 0.65f
+        private const val PURPLE_CORE = TechniqueTuning.PURPLE_RADIUS
+        private const val RAY_STRETCH = 1.5
+        private const val TAIL_SPACING = 2.5
     }
 }

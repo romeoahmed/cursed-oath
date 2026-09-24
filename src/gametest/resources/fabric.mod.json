@@ -10,6 +10,7 @@
 			"io.github.romeoahmed.cursedoath.MeleePreparationGameTest",
 			"io.github.romeoahmed.cursedoath.RedBlastGameTest",
 			"io.github.romeoahmed.cursedoath.TechniqueWaveGameTest",
+			"io.github.romeoahmed.cursedoath.PurpleLoadGameTest",
 			"io.github.romeoahmed.cursedoath.TerrainDestructionGameTest",
 			"io.github.romeoahmed.cursedoath.TechniqueImpactGameTest",
 			"io.github.romeoahmed.cursedoath.TechniqueOrbGameTest"

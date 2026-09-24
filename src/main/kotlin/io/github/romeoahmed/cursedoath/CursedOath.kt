@@ -2,7 +2,6 @@ package io.github.romeoahmed.cursedoath
 
 import io.github.romeoahmed.cursedoath.combat.CombatRuntime
 import io.github.romeoahmed.cursedoath.command.PracticeCommands
-import io.github.romeoahmed.cursedoath.technique.BlueFields
 import io.github.romeoahmed.cursedoath.technique.TechniqueProjectiles
 import io.github.romeoahmed.cursedoath.world.TerrainDestruction
 import net.fabricmc.api.ModInitializer
@@ -17,8 +16,7 @@ object CursedOath : ModInitializer {
 
     override fun onInitialize() {
         TechniqueProjectiles.initialize()
-        ServerTickEvents.END_LEVEL_TICK.register(TerrainDestruction::tick)
-        ServerTickEvents.END_LEVEL_TICK.register(BlueFields::tick)
+        ServerTickEvents.END_SERVER_TICK.register { TerrainDestruction.tick() }
         CombatRuntime.initialize()
         PracticeCommands.initialize()
         LOGGER.info("Cursed Oath initialized")

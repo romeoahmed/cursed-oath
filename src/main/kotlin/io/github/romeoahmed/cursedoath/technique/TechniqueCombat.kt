@@ -76,11 +76,6 @@ object TechniqueCombat {
             }
         }
 
-    fun clear() {
-        BlueFields.clear()
-        TerrainDestruction.clear()
-    }
-
     fun blackFlash(
         player: ServerPlayer,
         target: LivingEntity,

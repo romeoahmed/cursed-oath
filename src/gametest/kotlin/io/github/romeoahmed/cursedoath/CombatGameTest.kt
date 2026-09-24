@@ -7,6 +7,9 @@ import io.github.romeoahmed.cursedoath.combat.SorcererProfile
 import io.github.romeoahmed.cursedoath.technique.CleaveContact
 import io.github.romeoahmed.cursedoath.technique.Technique
 import io.github.romeoahmed.cursedoath.technique.TechniqueCombat
+import io.github.romeoahmed.cursedoath.technique.TechniqueOrb
+import io.github.romeoahmed.cursedoath.technique.TechniqueProjectiles
+import io.github.romeoahmed.cursedoath.technique.TechniqueWave
 import io.github.romeoahmed.cursedoath.world.TerrainDestruction
 import net.fabricmc.fabric.api.gametest.v1.GameTest
 import net.minecraft.core.BlockPos
@@ -22,6 +25,28 @@ import net.minecraft.world.phys.Vec3
 import java.util.UUID
 
 class CombatGameTest {
+    @GameTest(environment = "cursed-oath-test:combat")
+    fun unavailableFlightEndsWithoutLoadingChunksOrLeakingTerrain(helper: GameTestHelper) {
+        val distant = Vec3(10_000.5, 10.0, 10_000.5)
+        val player = helper.caster().apply { setPos(helper.absoluteVec(distant)) }
+        val chunk = ChunkPos.containing(player.blockPosition())
+        helper.assertTrue(helper.level.chunkSource.getChunkNow(chunk.x, chunk.z) == null, "Fixture must be unloaded")
+        for (technique in listOf(Technique.BLUE, Technique.RED, Technique.PURPLE, Technique.DISMANTLE)) {
+            val work = checkNotNull(TerrainDestruction.reserve(player))
+            val projectile =
+                if (technique == Technique.BLUE || technique == Technique.RED) {
+                    TechniqueOrb(TechniqueProjectiles.ORB, helper.level).apply { configure(player, technique, work) }
+                } else {
+                    TechniqueWave(TechniqueProjectiles.WAVE, helper.level).apply { configure(player, technique, work) }
+                }
+            // These entities are deliberately unregistered: only this call advances them.
+            projectile.tick()
+            helper.assertTrue(projectile.isRemoved && work.finished, "$technique must release its terrain slot")
+        }
+        helper.assertTrue(helper.level.chunkSource.getChunkNow(chunk.x, chunk.z) == null, "Flight must not load chunks")
+        helper.succeed()
+    }
+
     @GameTest(environment = "cursed-oath-test:combat")
     fun cleaveDoesNotLoadChunksForItsContactRay(helper: GameTestHelper) {
         val distant = Vec3(10_000.5, 10.0, 10_000.5)

@@ -52,7 +52,7 @@ object TechniqueProjectiles {
             }
             val orb = TechniqueOrb(ORB, level)
             orb.configure(player, technique, work)
-            if (level.addFreshEntity(orb)) orb.activate(player) else work.close()
+            if (!level.addFreshEntity(orb)) work.close()
         } else {
             val wave = TechniqueWave(WAVE, level)
             wave.configure(player, technique, work)

@@ -70,7 +70,7 @@ class RenderClientGameTest : FabricClientGameTest {
         val hidden = context.computeOnClient<Boolean, RuntimeException> { it.gui.hud.isHidden }
         try {
             if (!hidden) context.input.pressKey { it.keyToggleGui }
-            for (technique in listOf(Technique.BLUE, Technique.RED, Technique.CLEAVE)) {
+            for (technique in listOf(Technique.HEAL, Technique.RED, Technique.CLEAVE)) {
                 verifyEffect(context, technique, 0f, false)
             }
             verifyEffect(context, Technique.CLEAVE, 0f, true)
@@ -113,7 +113,7 @@ class RenderClientGameTest : FabricClientGameTest {
                     UUID.randomUUID(),
                     player.id,
                     technique.wireId,
-                    if (technique == Technique.CLEAVE) TechniqueEvent.RELEASE else TechniqueEvent.IMPACT,
+                    if (technique == Technique.RED) TechniqueEvent.IMPACT else TechniqueEvent.RELEASE,
                     level.gameTime - EFFECT_AGE,
                     origin,
                     destination,
@@ -130,6 +130,6 @@ class RenderClientGameTest : FabricClientGameTest {
         const val VERTICAL_DISTANCE = 4.0
         const val EFFECT_DISTANCE = 12.0
         const val EFFECT_AGE = 3L
-        const val EFFECT_EXPIRY = 65
+        const val EFFECT_EXPIRY = 20
     }
 }

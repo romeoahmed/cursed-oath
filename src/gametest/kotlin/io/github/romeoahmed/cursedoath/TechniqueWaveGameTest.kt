@@ -21,7 +21,7 @@ import net.minecraft.world.phys.Vec3
 
 class TechniqueWaveGameTest {
     @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:arena", maxTicks = 100)
-    fun purpleCarvesBeforeDamagingAndHitsEachTargetOnce(helper: GameTestHelper) {
+    fun purplePiercesWallsAndHitsEachTargetOnce(helper: GameTestHelper) {
         val player = helper.caster().apply { setPos(helper.absoluteVec(ORIGIN)) }
         val target = helper.stationaryTarget(EntityTypes.VILLAGER, TARGET)
         checkNotNull(target.getAttribute(Attributes.MAX_HEALTH)).baseValue = HEALTH.toDouble()
@@ -33,19 +33,19 @@ class TechniqueWaveGameTest {
         helper
             .startSequence()
             .thenWaitUntil {
-                helper.assertTrue(target.health < HEALTH, "Purple must reach a target after excavating the path")
-                helper.assertBlockPresent(Blocks.AIR, wall)
+                helper.assertTrue(target.health < HEALTH, "Purple must reach the target independently of excavation")
             }.thenExecuteAfter(SETTLE_TICKS) {
                 helper.assertTrue(
                     target.health == HEALTH - TechniqueTuning.PURPLE_DAMAGE,
                     "An overlapping target must not be damaged twice",
                 )
+                helper.assertBlockPresent(Blocks.AIR, wall)
                 wave.discard()
             }.thenSucceed()
     }
 
     @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:arena", maxTicks = 100)
-    fun bedrockStopsPurpleAndProtectsTheFarSide(helper: GameTestHelper) {
+    fun bedrockIsPreservedWithoutShieldingTargets(helper: GameTestHelper) {
         val player = helper.caster().apply { setPos(helper.absoluteVec(ORIGIN)) }
         val wall = BlockPos(14, 11, 18)
         helper.setBlock(wall, Blocks.BEDROCK)
@@ -53,20 +53,21 @@ class TechniqueWaveGameTest {
         val before = target.health
         val wave = helper.launchWave(player, Technique.PURPLE)
         helper.succeedWhen {
-            helper.assertTrue(wave.isRemoved, "The protected surface must terminate Purple")
+            helper.assertTrue(wave.z > helper.absolutePos(wall).z, "Purple must pass the protected surface")
             helper.assertBlockPresent(Blocks.BEDROCK, wall)
-            helper.assertTrue(target.health == before, "Targets behind the protected surface must be safe")
+            helper.assertTrue(target.health < before, "A preserved block must not shield entities")
         }
     }
 
     @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:arena", maxTicks = 100)
-    fun containersStopDestruction(helper: GameTestHelper) {
+    fun containersRemainWithoutStoppingPurple(helper: GameTestHelper) {
         val player = helper.caster().apply { setPos(helper.absoluteVec(ORIGIN)) }
         val chest = BlockPos(14, 11, 18)
         helper.setBlock(chest, Blocks.CHEST)
+        helper.setBlock(chest.south(), Blocks.WATER)
         val wave = helper.launchWave(player, Technique.PURPLE)
         helper.succeedWhen {
-            helper.assertTrue(wave.isRemoved, "A container must stop excavation")
+            helper.assertTrue(wave.z > helper.absolutePos(chest).z, "Purple must pass a container")
             helper.assertBlockPresent(Blocks.CHEST, chest)
         }
     }
@@ -105,7 +106,7 @@ class TechniqueWaveGameTest {
     }
 
     @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:arena", maxTicks = 120)
-    fun peripheralBedrockShieldsItsPathWithoutCancellingPurple(helper: GameTestHelper) {
+    fun peripheralBedrockDoesNotShieldTerrain(helper: GameTestHelper) {
         val player = helper.caster().apply { setPos(helper.absoluteVec(ORIGIN)) }
         val protected = BlockPos(18, 11, 18)
         val behind = protected.south(2)
@@ -116,21 +117,8 @@ class TechniqueWaveGameTest {
         helper.succeedWhen {
             helper.assertTrue(exposed.health < exposed.maxHealth, "Clear paths must still receive Purple damage")
             helper.assertBlockPresent(Blocks.BEDROCK, protected)
-            helper.assertBlockPresent(Blocks.STONE, behind)
+            helper.assertBlockPresent(Blocks.AIR, behind)
             wave.discard()
-        }
-    }
-
-    @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:arena", maxTicks = 100)
-    fun purpleDamagesTheNearSideBeforeStoppingAtBedrock(helper: GameTestHelper) {
-        val player = helper.caster().apply { setPos(helper.absoluteVec(ORIGIN)) }
-        val near = helper.stationaryTarget(EntityTypes.HUSK, BlockPos(14, 10, 15))
-        val wall = BlockPos(14, 11, 18)
-        helper.setBlock(wall, Blocks.BEDROCK)
-        val wave = helper.launchWave(player, Technique.PURPLE)
-        helper.succeedWhen {
-            helper.assertTrue(wave.isRemoved, "A central protected surface must stop travel")
-            helper.assertTrue(near.health < near.maxHealth, "A later obstacle must not erase an earlier contact")
         }
     }
 
@@ -170,7 +158,6 @@ class TechniqueWaveGameTest {
         helper.setBlock(pos, Blocks.CHEST)
         helper.succeedWhen {
             helper.assertTrue(work.finished, "The queued operation must settle")
-            helper.assertTrue(work.blocked, "A newly placed container must be recorded as protected")
             helper.assertBlockPresent(Blocks.CHEST, pos)
         }
     }
@@ -192,25 +179,50 @@ class TechniqueWaveGameTest {
     }
 
     @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:arena", maxTicks = 100)
-    fun stalledPurpleCannotDamageAheadOfItsVisibleBody(helper: GameTestHelper) {
+    fun purpleMaintainsSpeedThroughDenseTerrainAfterCasterRemoval(helper: GameTestHelper) {
         val player = helper.caster().apply { setPos(helper.absoluteVec(ORIGIN)) }
-        val stone = BlockPos.betweenClosed(BlockPos(8, 6, 6), BlockPos(13, 16, 16))
-        stone.forEach { helper.setBlock(it, Blocks.STONE) }
-        val target = helper.stationaryTarget(EntityTypes.VILLAGER, BlockPos(14, 10, 17))
-        val wave = helper.launchWave(player, Technique.PURPLE)
-        helper.onEachTick {
-            if (wave.z == player.z) {
-                helper.assertTrue(target.health == target.maxHealth, "Queued travel must not project damage ahead")
-            }
+        BlockPos.betweenClosed(DENSE_MIN, DENSE_MAX).forEach {
+            helper.setBlock(it, Blocks.STONE)
         }
+        val target = helper.stationaryTarget(EntityTypes.VILLAGER, TARGET)
+        val wave = helper.launchWave(player, Technique.PURPLE)
+        val start = wave.position()
+        player.discard()
+        repeat(FLIGHT_TICKS) { wave.tick() }
+        helper.assertTrue(
+            wave.position().distanceTo(start) == TechniqueTuning.PURPLE_SPEED * FLIGHT_TICKS,
+            "Terrain density and caster removal must not change flight speed",
+        )
+        helper.assertTrue(target.health < target.maxHealth, "Flight must still damage targets inside terrain")
+        wave.discard()
+        val center = BlockPos(14, 11, 18)
         helper.succeedWhen {
-            helper.assertTrue(wave.z > player.z, "The body must advance after excavation")
-            helper.assertTrue(target.health < target.maxHealth, "The advancing body must eventually make contact")
+            helper.assertBlockPresent(Blocks.AIR, center)
+        }
+    }
+
+    @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:arena", maxTicks = 100)
+    fun purplePreservesDeniedBlocksButExcavatesBehindThem(helper: GameTestHelper) {
+        val player = helper.caster().apply { setPos(helper.absoluteVec(ORIGIN)) }
+        val denied = BlockPos(14, 11, 18)
+        val behind = denied.south(2)
+        val absolute = helper.absolutePos(denied)
+        val owner = player.uuid
+        PlayerBlockBreakEvents.BEFORE.register { _, actor, pos, _, _ -> actor.uuid != owner || pos != absolute }
+        helper.setBlock(denied, Blocks.STONE)
+        helper.setBlock(behind, Blocks.STONE)
+        val wave = helper.launchWave(player, Technique.PURPLE)
+        helper.succeedWhen {
+            helper.assertBlockPresent(Blocks.AIR, behind)
+            helper.assertBlockPresent(Blocks.STONE, denied)
             wave.discard()
         }
     }
 
     private companion object {
+        val DENSE_MIN = BlockPos(8, 6, 6)
+        val DENSE_MAX = BlockPos(20, 16, 24)
+        const val FLIGHT_TICKS = 3
         val ORIGIN = Vec3(14.5, 10.0, 9.5)
         val TARGET = BlockPos(14, 10, 21)
         const val SETTLE_TICKS = 20

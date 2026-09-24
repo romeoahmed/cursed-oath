@@ -47,13 +47,14 @@ class TechniqueProjectileRenderer<T : TechniqueProjectile>(
         val technique = state.technique
         val direction = state.direction
         val age = state.ageInTicks
+        val detail = TechniqueGeometry.detail(state.distanceToCameraSq)
         val progress = if (technique == Technique.BLUE) (age / TechniqueTuning.BLUE_DURATION).coerceIn(0f, 1f) else 0f
         val opacity =
             ((sqrt(state.distanceToCameraSq) - NEAR_DISTANCE) / FADE_DISTANCE)
                 .coerceIn(MIN_OPACITY, 1.0)
                 .toFloat()
         collector.submitCustomGeometry(poseStack, TechniqueRenderTypes.additive) { pose, vertices ->
-            val geometry = TechniqueGeometry(pose, vertices, opacity)
+            val geometry = TechniqueGeometry(pose, vertices, opacity, detail)
             if (technique == Technique.RED) {
                 geometry.orb(direction)
             } else {
@@ -62,7 +63,7 @@ class TechniqueProjectileRenderer<T : TechniqueProjectile>(
         }
         if (technique != Technique.DISMANTLE) {
             collector.submitCustomGeometry(poseStack, TechniqueRenderTypes.core) { pose, vertices ->
-                val geometry = TechniqueGeometry(pose, vertices, opacity)
+                val geometry = TechniqueGeometry(pose, vertices, opacity, detail)
                 if (technique == Technique.RED) geometry.orbCore() else geometry.core(technique, progress)
             }
         }

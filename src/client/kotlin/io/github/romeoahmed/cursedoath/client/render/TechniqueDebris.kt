@@ -19,13 +19,13 @@ internal object TechniqueDebris {
     fun blue(
         client: Minecraft,
         center: Vec3,
-    ) {
-        val level = client.level ?: return
-        val player = client.player ?: return
+    ): Boolean {
+        val level = client.level ?: return false
+        val player = client.player ?: return false
         if (client.options.particles().get() != ParticleStatus.ALL ||
             player.distanceToSqr(center) > MAX_DISTANCE_SQUARED
         ) {
-            return
+            return false
         }
         repeat(SAMPLES) {
             val random = level.random
@@ -52,5 +52,6 @@ internal object TechniqueDebris {
                 particle.scale(SCALE)
             }
         }
+        return true
     }
 }

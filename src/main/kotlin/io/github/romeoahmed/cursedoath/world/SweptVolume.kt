@@ -9,13 +9,14 @@ internal class SweptVolume(
     val start: Vec3,
     val end: Vec3,
     private val halfSize: Vec3,
-    private val rounded: Boolean = false,
+    rounded: Boolean = false,
 ) {
     val forward = end.subtract(start).normalize()
     private val reference = if (abs(forward.y) < VERTICAL_THRESHOLD) Vec3(0.0, 1.0, 0.0) else Vec3(0.0, 0.0, 1.0)
     private val side = forward.cross(reference).normalize()
     private val up = side.cross(forward).normalize()
     private val destination = Vec3(0.0, 0.0, end.distanceTo(start))
+    private val sphere = if (rounded) SphereSweep(start, end, halfSize.x) else null
     val bounds: AABB =
         if (rounded) {
             AABB(start, end).inflate(halfSize.x)
@@ -31,7 +32,10 @@ internal class SweptVolume(
         box: AABB,
         movement: Vec3 = Vec3.ZERO,
     ): Double? {
-        if (rounded) return SphereSweep(start.add(movement), end, halfSize.x, box).entry()
+        if (sphere != null) {
+            val sweep = if (movement == Vec3.ZERO) sphere else SphereSweep(start.add(movement), end, halfSize.x)
+            return sweep.entry(box)
+        }
         val center = local(box.center.subtract(start))
         val half = Vec3(box.xsize / 2, box.ysize / 2, box.zsize / 2)
         val motion = local(movement)

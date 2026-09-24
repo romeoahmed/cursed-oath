@@ -7,12 +7,12 @@ Jujutsu Kaisen combat in Minecraft, built with Fabric, Kotlin, and Java. The pro
 ## What you can try
 
 - Launch **Blue** to pull targets toward a moving core, or **Red** for a repulsive impact.
-- Form **Hollow Purple** by bringing Blue and Red together, then carve a path through terrain.
+- Form **Hollow Purple** by bringing Blue and Red together, then launch a piercing attack whose flight does not wait for terrain excavation.
 - Fire **Dismantle** or use close-range **Cleave** to cut an intersecting grid through targets and blocks.
 - Toggle the **Infinity** defense prototype, heal yourself, and prepare melee strikes with a chance of **Black Flash**.
 - Play with English, Simplified Chinese, or Japanese text and rebindable controls.
 
-Terrain damage is permanent. Use a disposable world while testing. Containers, fluids, unbreakable blocks, and denied block-break events are protected; compatibility with other protection mods requires verification.
+Terrain damage is permanent. Use a disposable world while testing. Containers, fluids, unbreakable blocks, and denied block-break events are protected; preserved blocks do not shield targets from Purple. Compatibility with other protection mods requires verification.
 
 ## Run from source
 
@@ -58,7 +58,9 @@ See [Repository Guidelines](AGENTS.md) for code conventions and change-specific 
 ./gradlew runClientGameTest
 ```
 
-`build` runs formatting, static analysis, unit tests, server GameTests, and scoped coverage checks. Client GameTests require a graphics session and run separately. Reports are in `build/reports/`; client screenshots are in `build/run/clientGameTest/screenshots/`. CI uses Xvfb/Mesa and uploads reports, logs, and screenshots.
+`build` runs formatting, static analysis, unit tests, server GameTests, and scoped coverage checks. Client GameTests run separately with Vulkan: a preflight checks device and presentation support, and tests reject backend fallback. A graphics session is required. Reports are in `build/reports/`; client screenshots are in `build/run/clientGameTest/screenshots/`.
+
+CI uses Xvfb with Mesa Lavapipe for software Vulkan rendering. It uploads reports, logs, and screenshots even after test failures; packaged JARs are uploaded only after all checks pass.
 
 Include reproduction steps and expected behavior in bug reports. PRs should explain the change and its validation, with screenshots for visual changes. Multiplayer load, equipment combinations, and alternate rendering backends still need broader testing.
 

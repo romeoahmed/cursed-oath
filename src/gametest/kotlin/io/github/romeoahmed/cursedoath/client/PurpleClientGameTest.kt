@@ -4,6 +4,7 @@ import io.github.romeoahmed.cursedoath.client.input.CombatInput
 import io.github.romeoahmed.cursedoath.combat.CursedEnergy
 import io.github.romeoahmed.cursedoath.technique.Technique
 import io.github.romeoahmed.cursedoath.technique.TechniqueProjectiles
+import io.github.romeoahmed.cursedoath.technique.TechniqueTuning
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext
@@ -43,6 +44,11 @@ class PurpleClientGameTest : FabricClientGameTest {
             context.capture("purple-flight")
             world.server.runCommand("tick unfreeze")
             world.server.waitFor { world.target(target).health < TARGET_HEALTH }
+            world.server.waitFor {
+                world.connection.serverLevel
+                    .getBlockState(WALL_CENTER)
+                    .isAir
+            }
             world.server.runCommand("tick freeze")
             world.connection.waitForClientboundPackets()
             world.connection.waitForChunksRender()
@@ -95,9 +101,9 @@ class PurpleClientGameTest : FabricClientGameTest {
                 world.connection.serverLevel
                     .getBlockState(WALL_CENTER)
                     .isAir,
-            ) { "Purple must open the wall before damage" }
+            ) { "Queued Purple excavation must open the wall" }
             check(
-                world.target(target).health == TARGET_HEALTH - PURPLE_DAMAGE,
+                world.target(target).health == TARGET_HEALTH - TechniqueTuning.PURPLE_DAMAGE,
             ) { "Purple must deal one committed hit" }
         }
         context.runOnClient<RuntimeException> {
@@ -139,7 +145,12 @@ class PurpleClientGameTest : FabricClientGameTest {
         world.connection.waitForServerboundPackets()
         world.server.waitFor { world.target(id).health < TARGET_HEALTH }
         world.server.waitFor { world.target(id).z < TARGET_Z - MOVEMENT_THRESHOLD }
+        world.server.runCommand("tick freeze")
+        world.server.runCommand("tp @a 0.5 -45 6.5 facing 0.5 -49 13.5")
+        world.connection.waitForClientboundPackets()
+        world.connection.waitForChunksRender()
         context.capture("blue-pull-and-compression")
+        world.server.runCommand("tick unfreeze")
     }
 
     private fun select(
@@ -179,7 +190,6 @@ class PurpleClientGameTest : FabricClientGameTest {
         const val TARGET_Y = -50.0
         const val TARGET_Z = 17.5
         const val TARGET_HEALTH = 500f
-        const val PURPLE_DAMAGE = 240f
         const val MOVEMENT_THRESHOLD = 0.2
     }
 }

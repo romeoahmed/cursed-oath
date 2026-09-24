@@ -3,6 +3,7 @@ package io.github.romeoahmed.cursedoath.technique
 import io.github.romeoahmed.cursedoath.network.TechniqueEvent
 import io.github.romeoahmed.cursedoath.world.TerrainDestruction
 import io.github.romeoahmed.cursedoath.world.hasLoadedChunks
+import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.sounds.SoundEvents
@@ -22,7 +23,6 @@ class TechniqueOrb(
     level: Level,
 ) : TechniqueProjectile(type, level) {
     private var excavation: TerrainDestruction.Work? = null
-    private var field: BlueFields.Field? = null
     private var remaining = 0.0
     private var settled = false
 
@@ -37,13 +37,8 @@ class TechniqueOrb(
         deltaMovement = player.lookAngle.scale(if (ability == Technique.BLUE) BLUE_SPEED else RED_SPEED)
     }
 
-    internal fun activate(player: ServerPlayer) {
-        if (technique == Technique.BLUE) field = BlueFields.create(player, position())
-    }
-
     override fun onRemoval(reason: RemovalReason) {
         excavation?.close()
-        field?.let(BlueFields::remove)
         super.onRemoval(reason)
     }
 
@@ -56,12 +51,12 @@ class TechniqueOrb(
             discard()
             return
         }
-        if (settled) return
-        if (work.finished) {
+        if (!settled && work.finished) {
             discard()
             return
         }
-        travel(level, player, work)
+        if (!settled) travel(level, player, work)
+        if (!isRemoved && technique == Technique.BLUE) BlueField.tick(player, position(), tickCount)
     }
 
     private fun travel(
@@ -73,7 +68,9 @@ class TechniqueOrb(
         val distance = minOf(movement.length(), remaining)
         val direction = movement.normalize()
         val end = position().add(direction.scale(distance))
-        if (!level.hasLoadedChunks(AABB(position(), end).inflate(AIM_MARGIN.toDouble()))) {
+        if (!level.isPositionEntityTicking(BlockPos.containing(end)) ||
+            !level.hasLoadedChunks(AABB(position(), end).inflate(AIM_MARGIN.toDouble()))
+        ) {
             discard()
             return
         }
@@ -103,7 +100,6 @@ class TechniqueOrb(
                 hit.location
             }
         setPos(center)
-        field?.center = center
         remaining -= distance
         if (hit.type != HitResult.Type.MISS || remaining <= 0) impact(player, work, direction)
     }

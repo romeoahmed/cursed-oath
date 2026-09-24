@@ -3,25 +3,24 @@ package io.github.romeoahmed.cursedoath.world
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents
 import net.minecraft.core.BlockPos
 import net.minecraft.core.SectionPos
-import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.level.ClipContext
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
-import java.util.IdentityHashMap
 import java.util.PriorityQueue
 
 /** Bounded, round-robin excavation. Reservations include casts still preparing. */
 internal object TerrainDestruction {
     private const val MAX_WORK = 16
-    private const val CANDIDATES_PER_TICK = 4096
-    private const val WRITES_PER_TICK = 256
+    private const val CANDIDATES_PER_TICK = 16384
+    internal const val WRITES_PER_TICK = 1024
     private const val SLICE = 16
     private const val NANOS_PER_TICK = 4_000_000L
     private const val LIFETIME = 600L
-    private val worlds = IdentityHashMap<ServerLevel, ArrayDeque<Work>>()
+    private const val MAX_SEGMENTS = 64
+    private val queue = ArrayDeque<Work>()
 
     class Work(
         val owner: ServerPlayer,
@@ -31,22 +30,14 @@ internal object TerrainDestruction {
 
         // Null entries account for geometry visits that do not commit a block removal.
         private var positions: Iterator<BlockPos?>? = null
+        private val pending = ArrayDeque<Iterator<BlockPos?>>()
+        private var released = false
         var finished = false
             private set
-        var blocked = false
-            private set
         var persistent = false
-        var drops = true
         var onComplete: (() -> Unit)? = null
         private var source: ((Vec3) -> Vec3)? = null
-        val ready: Boolean get() = positions == null
-
-        fun sweep(
-            volume: SweptVolume,
-            origin: Vec3 = volume.start,
-        ) {
-            cuts(listOf(volume), origin)
-        }
+        val ready: Boolean get() = positions == null && pending.isEmpty()
 
         fun cuts(
             volumes: List<SweptVolume>,
@@ -60,7 +51,8 @@ internal object TerrainDestruction {
                 sequence {
                     val candidates = PriorityQueue(compareBy<Candidate> { it.distance }.thenBy { it.position.asLong() })
                     for (pos in BlockPos.betweenClosed(bounds)) {
-                        if (volumes.any { it.entry(AABB(pos)) != null }) {
+                        val box = AABB(pos)
+                        if (volumes.any { it.entry(box) != null }) {
                             val distance = Vec3.atCenterOf(pos).subtract(origin).dot(first.forward)
                             candidates.add(Candidate(pos.immutable(), distance))
                         }
@@ -68,6 +60,30 @@ internal object TerrainDestruction {
                     }
                     while (candidates.isNotEmpty()) yield(candidates.remove().position)
                 }.iterator()
+        }
+
+        /** One bounded segment per flight tick; no sorting or cover rays for a piercing attack. */
+        fun pierce(
+            volume: SweptVolume,
+            previous: SweptVolume?,
+        ) {
+            check(!finished && pending.size < MAX_SEGMENTS)
+            released = true
+            persistent = true
+            pending.addLast(
+                BlockPos
+                    .betweenClosed(volume.bounds)
+                    .asSequence()
+                    .map { pos ->
+                        val box = AABB(pos)
+                        if (volume.entry(box) != null && previous?.entry(box) == null) pos.immutable() else null
+                    }.iterator(),
+            )
+        }
+
+        fun seal() {
+            persistent = false
+            if (ready) close()
         }
 
         fun sphere(
@@ -88,32 +104,34 @@ internal object TerrainDestruction {
         fun close() {
             finished = true
             positions = null
+            pending.clear()
             onComplete = null
+            source = null
         }
 
         private fun stop(): Boolean {
-            blocked = true
             close()
             return false
         }
 
         private val validOwner: Boolean get() =
-            owner.level() === level && owner.isAlive && !owner.isRemoved && !owner.isSpectator
+            released || (owner.level() === level && owner.isAlive && !owner.isRemoved && !owner.isSpectator)
 
         internal fun advance(): Boolean {
-            if (!validOwner || level.gameTime >= expires) {
+            if (!validOwner || (!released && level.gameTime >= expires)) {
                 return stop()
             }
-            val cursor = positions ?: return false
-            if (!cursor.hasNext()) {
+            val cursor = positions ?: pending.removeFirstOrNull()?.also { positions = it } ?: return false
+            return if (!cursor.hasNext()) {
                 positions = null
                 val complete = onComplete
                 onComplete = null
-                if (!persistent) close()
+                if (!persistent && pending.isEmpty()) close()
                 complete?.invoke()
-                return false
+                false
+            } else {
+                cursor.next()?.let(::excavate) ?: false
             }
-            return cursor.next()?.let(::excavate) ?: false
         }
 
         private fun excavate(pos: BlockPos): Boolean {
@@ -122,15 +140,12 @@ internal object TerrainDestruction {
                     SectionPos.blockToSectionCoord(pos.z),
                 ) == null
             ) {
-                return stop()
+                return if (released) false else stop()
             }
             if (!level.worldBorder.isWithinBounds(pos) || level.isOutsideBuildHeight(pos)) return false
             val state = level.getBlockState(pos)
             if (state.isAir) return false
-            if (protected(state, pos)) {
-                blocked = true
-                return false
-            }
+            if (protected(state, pos)) return false
             val origin = source?.invoke(Vec3.atCenterOf(pos))
             if (origin != null && !exposed(origin, pos)) return false
             return breakBlock(pos, state)
@@ -165,26 +180,27 @@ internal object TerrainDestruction {
         ): Boolean {
             if (!PlayerBlockBreakEvents.BEFORE.invoker().beforeBlockBreak(level, owner, pos, state, null)) {
                 PlayerBlockBreakEvents.CANCELED.invoker().onBlockBreakCanceled(level, owner, pos, state, null)
-                blocked = true
                 return false
             }
-            // A callback may replace the block. Never destroy a state that was not checked.
-            if (!validOwner || level.getBlockState(pos) != state || protected(state, pos)) return false
-            if (!level.destroyBlock(pos, drops, owner)) return false
+            // A callback may cancel the work or replace the block before this removal commits.
+            if (finished || !validOwner) return false
+            if (level.getBlockState(pos) != state || protected(state, pos)) return false
+            if (!level.destroyBlock(pos, !released, owner)) return false
             PlayerBlockBreakEvents.AFTER.invoker().afterBlockBreak(level, owner, pos, state, null)
             return true
         }
     }
 
     fun reserve(owner: ServerPlayer): Work? {
-        val queue = worlds.getOrPut(owner.level()) { ArrayDeque() }
         queue.removeAll { it.finished }
         if (queue.size >= MAX_WORK) return null
         return Work(owner).also(queue::addLast)
     }
 
-    fun tick(level: ServerLevel) {
-        val queue = worlds[level] ?: return
+    fun tick() {
+        if (queue.isEmpty()) return
+        val event = TerrainEvent()
+        event.begin()
         val budget = Budget()
         var idle = 0
         while (queue.isNotEmpty() && budget.available && idle < queue.size) {
@@ -195,13 +211,21 @@ internal object TerrainDestruction {
                 if (!work.finished) queue.addLast(work)
             }
         }
-        if (queue.isEmpty()) worlds.remove(level)
+        event.end()
+        if (event.shouldCommit()) {
+            event.visits = budget.candidates
+            event.blocks = budget.writes
+            event.pending = queue.size
+            event.commit()
+        }
     }
 
     private class Budget {
         private val deadline = System.nanoTime() + NANOS_PER_TICK
-        private var candidates = 0
-        private var writes = 0
+        var candidates = 0
+            private set
+        var writes = 0
+            private set
         val available: Boolean get() =
             candidates < CANDIDATES_PER_TICK && writes < WRITES_PER_TICK &&
                 System.nanoTime() < deadline
@@ -217,8 +241,8 @@ internal object TerrainDestruction {
     }
 
     fun clear() {
-        worlds.values.forEach { queue -> queue.forEach(Work::close) }
-        worlds.clear()
+        queue.forEach(Work::close)
+        queue.clear()
     }
 
     private data class Candidate(

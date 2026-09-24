@@ -13,6 +13,7 @@ internal class TechniqueMesh(
     private val pose: PoseStack.Pose,
     private val vertices: VertexConsumer,
     private val opacity: Float = 1f,
+    private val detail: Int = 1,
 ) {
     fun ring(
         center: Vec3,
@@ -22,11 +23,11 @@ internal class TechniqueMesh(
         alpha: Float = 1f,
     ) {
         val color = color(rgb, alpha)
-        for (i in 0..<SEGMENTS) {
+        for (i in 0..<SEGMENTS step detail) {
             ringVertex(center, axes, circle[i], radius * INNER_RADIUS, color)
             ringVertex(center, axes, circle[i], radius, color)
-            ringVertex(center, axes, circle[i + 1], radius, color)
-            ringVertex(center, axes, circle[i + 1], radius * INNER_RADIUS, color)
+            ringVertex(center, axes, circle[i + detail], radius, color)
+            ringVertex(center, axes, circle[i + detail], radius * INNER_RADIUS, color)
         }
     }
 
@@ -38,12 +39,12 @@ internal class TechniqueMesh(
         solid: Boolean = false,
     ) {
         val color = color(rgb, alpha * if (solid) 1f else CORE_ALPHA)
-        for (lat in 0..<LATITUDES) {
-            for (i in 0..<SEGMENTS) {
+        for (lat in 0..<LATITUDES step detail) {
+            for (i in 0..<SEGMENTS step detail) {
                 sphereVertex(center, sphere[lat][i], radius, color)
-                sphereVertex(center, sphere[lat + 1][i], radius, color)
-                sphereVertex(center, sphere[lat + 1][i + 1], radius, color)
-                sphereVertex(center, sphere[lat][i + 1], radius, color)
+                sphereVertex(center, sphere[lat + detail][i], radius, color)
+                sphereVertex(center, sphere[lat + detail][i + detail], radius, color)
+                sphereVertex(center, sphere[lat][i + detail], radius, color)
             }
         }
     }
@@ -97,6 +98,22 @@ internal class TechniqueMesh(
                 points[i + 1],
                 color,
             )
+        }
+    }
+
+    fun ribbon(
+        count: Int,
+        width: Vec3,
+        rgb: Int,
+        alpha: Float,
+        point: (Int) -> Vec3,
+    ) {
+        val color = color(rgb, alpha)
+        var previous = point(0)
+        for (i in 1..<count) {
+            val next = point(i)
+            quad(previous, previous.add(width), next.add(width), next, color)
+            previous = next
         }
     }
 

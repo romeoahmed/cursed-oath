@@ -3,11 +3,9 @@ package io.github.romeoahmed.cursedoath.technique
 import io.github.romeoahmed.cursedoath.world.SweptVolume
 import io.github.romeoahmed.cursedoath.world.TerrainDestruction
 import io.github.romeoahmed.cursedoath.world.hasLoadedChunks
-import net.minecraft.core.particles.DustParticleOptions
+import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
-import net.minecraft.sounds.SoundEvents
-import net.minecraft.sounds.SoundSource
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.level.ClipContext
@@ -22,15 +20,16 @@ class TechniqueWave(
     level: Level,
 ) : TechniqueProjectile(type, level) {
     private var excavation: TerrainDestruction.Work? = null
+    private var purple: PurpleFlight? = null
     private var direction = Vec3.ZERO
     private var origin = Vec3.ZERO
     private var next: Vec3? = null
     private var traveled = 0.0
     private val hit = HashSet<UUID>()
-    private val size: Vec3 get() = if (technique == Technique.PURPLE) PURPLE_SIZE else SLASH_SIZE
+    private val size = Vec3(TechniqueTuning.DISMANTLE_WIDTH, 0.18, 0.18)
 
     override fun onRemoval(reason: RemovalReason) {
-        excavation?.close()
+        purple?.finish() ?: excavation?.close()
         super.onRemoval(reason)
     }
 
@@ -40,41 +39,46 @@ class TechniqueWave(
         work: TerrainDestruction.Work,
     ) {
         launch(player, ability)
+        if (ability == Technique.PURPLE) {
+            purple = PurpleFlight(this, player, work)
+            return
+        }
         direction = player.lookAngle
         origin = position()
         excavation = work
         work.persistent = true
-        work.drops = ability != Technique.PURPLE
     }
 
     override fun tick() {
         super.tick()
-        if (level().isClientSide) {
-            if (technique == Technique.PURPLE) trail()
-            return
-        }
+        if (level().isClientSide) return
+        val flight = purple
+        if (flight != null) flight.tick() else tickSlash()
+    }
+
+    private fun tickSlash() {
         val level = level() as? ServerLevel ?: return
         val work = excavation
         val player = work?.owner?.takeIf { it.isAlive && !it.isRemoved && !it.isSpectator }
         if (player == null || work.finished) {
-            finish()
+            discard()
             return
         }
         if (player.level() !== level || tickCount >= MAX_AGE) {
-            finish()
+            discard()
             return
         }
         val end = next ?: position().add(direction.scale(CONTACT_STEP))
-        val bounds = SweptVolume(origin, end, size, technique == Technique.PURPLE).bounds.inflate(MOVEMENT_MARGIN)
+        val bounds = SweptVolume(origin, end, size).bounds.inflate(MOVEMENT_MARGIN)
         if (!level.hasLoadedChunks(bounds)) {
-            finish()
+            discard()
             return
         }
         if (work.ready) {
             advance(level, player, work)
         } else {
             val currentEnd = position().add(direction.scale(CONTACT_STEP))
-            damage(level, player, SweptVolume(position(), currentEnd, size, technique == Technique.PURPLE))
+            damage(level, player, SweptVolume(position(), currentEnd, size))
         }
     }
 
@@ -85,7 +89,7 @@ class TechniqueWave(
     ) {
         val destination = next
         if (destination != null) {
-            val volume = SweptVolume(position(), destination, size, technique == Technique.PURPLE)
+            val volume = SweptVolume(position(), destination, size)
             damage(level, player, volume)
             val obstruction =
                 level.clipIncludingBorder(
@@ -93,7 +97,7 @@ class TechniqueWave(
                 )
             if (obstruction.type != HitResult.Type.MISS) {
                 setPos(obstruction.location)
-                finish()
+                discard()
                 return
             }
             traveled += destination.distanceTo(position())
@@ -107,18 +111,18 @@ class TechniqueWave(
         level: ServerLevel,
         work: TerrainDestruction.Work,
     ) {
-        val range = if (technique == Technique.PURPLE) PURPLE_RANGE else SLASH_RANGE
-        if (traveled >= range) {
-            finish()
+        if (traveled >= SLASH_RANGE) {
+            discard()
         } else {
-            val speed = if (technique == Technique.PURPLE) PURPLE_SPEED else SLASH_SPEED
-            val end = position().add(direction.scale(minOf(speed, range - traveled)))
-            if (!level.hasLoadedChunks(SweptVolume(origin, end, size, technique == Technique.PURPLE).bounds)) {
-                finish()
+            val end = position().add(direction.scale(minOf(SLASH_SPEED, SLASH_RANGE - traveled)))
+            if (!level.isPositionEntityTicking(BlockPos.containing(end)) ||
+                !level.hasLoadedChunks(SweptVolume(origin, end, size).bounds)
+            ) {
+                discard()
                 return
             }
             next = end
-            work.sweep(SweptVolume(position(), end, size, technique == Technique.PURPLE), origin)
+            work.cuts(listOf(SweptVolume(position(), end, size)), origin)
         }
     }
 
@@ -159,46 +163,14 @@ class TechniqueWave(
             )
         if (covered.type != HitResult.Type.MISS) return
         hit.add(target.uuid)
-        val damage = if (technique == Technique.PURPLE) PURPLE_DAMAGE else SLASH_DAMAGE
-        target.hurtServer(level, level.damageSources().playerAttack(player), damage)
-    }
-
-    private fun trail() {
-        repeat(TRAIL_PARTICLES) {
-            val offset =
-                Vec3(
-                    random.nextGaussian(),
-                    random.nextGaussian(),
-                    random.nextGaussian(),
-                ).normalize().scale(TRAIL_RADIUS)
-            level().addParticle(PURPLE_DUST, x + offset.x, y + offset.y, z + offset.z, 0.0, 0.0, 0.0)
-        }
-    }
-
-    private fun finish() {
-        excavation?.close()
-        val level = level() as? ServerLevel
-        if (level != null && technique == Technique.PURPLE) {
-            level.playSound(null, x, y, z, SoundEvents.GENERIC_EXPLODE.value(), SoundSource.PLAYERS, 1f, IMPACT_PITCH)
-        }
-        discard()
+        target.hurtServer(level, level.damageSources().playerAttack(player), SLASH_DAMAGE)
     }
 
     companion object {
-        private val PURPLE_DUST = DustParticleOptions(Technique.PURPLE.color, 1f)
-        private const val TRAIL_PARTICLES = 4
-        private const val TRAIL_RADIUS = TechniqueTuning.PURPLE_RADIUS
-        private val PURPLE_SIZE =
-            Vec3(TechniqueTuning.PURPLE_RADIUS, TechniqueTuning.PURPLE_RADIUS, TechniqueTuning.PURPLE_RADIUS)
-        private val SLASH_SIZE = Vec3(TechniqueTuning.DISMANTLE_WIDTH, 0.18, 0.18)
-        private const val PURPLE_RANGE = TechniqueTuning.PURPLE_RANGE
         private const val SLASH_RANGE = TechniqueTuning.DISMANTLE_RANGE
-        private const val PURPLE_SPEED = 3.0
         private const val SLASH_SPEED = 6.0
-        private const val PURPLE_DAMAGE = TechniqueTuning.PURPLE_DAMAGE
         private const val SLASH_DAMAGE = TechniqueTuning.DISMANTLE_DAMAGE
         private const val MOVEMENT_MARGIN = 4.0
-        private const val IMPACT_PITCH = 0.7f
         private const val CONTACT_STEP = 0.001
         private const val MAX_AGE = 480
     }

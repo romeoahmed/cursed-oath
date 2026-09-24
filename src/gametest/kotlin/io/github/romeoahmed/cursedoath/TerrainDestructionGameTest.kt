@@ -16,6 +16,31 @@ import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.Vec3
 
 class TerrainDestructionGameTest {
+    @GameTest(environment = "cursed-oath-test:terrain")
+    fun callbackCancellationPreventsBlockRemoval(helper: GameTestHelper) {
+        val player = helper.caster()
+        val position = BlockPos(2, 1, 2)
+        val absolute = helper.absolutePos(position)
+        helper.setBlock(position, Blocks.STONE)
+        val work = checkNotNull(TerrainDestruction.reserve(player))
+        work.sphere(Vec3.atCenterOf(absolute), 1.0)
+        var completed = false
+        var canceled = false
+        work.onComplete = { completed = true }
+        PlayerBlockBreakEvents.BEFORE.register { _, actor, pos, _, _ ->
+            if (actor === player && pos == absolute) {
+                canceled = true
+                work.close()
+            }
+            true
+        }
+        helper.succeedWhen {
+            helper.assertTrue(canceled && work.finished, "The callback must close the active task")
+            helper.assertTrue(!completed, "Canceled work must not run its completion callback")
+            helper.assertBlockPresent(Blocks.STONE, position)
+        }
+    }
+
     @GameTest(environment = "cursed-oath-test:terrain", structure = "cursed-oath-test:arena")
     fun geometryEnumerationYieldsBeforeExcavation(helper: GameTestHelper) {
         val work = checkNotNull(TerrainDestruction.reserve(helper.caster()))
@@ -24,7 +49,7 @@ class TerrainDestructionGameTest {
         val start = helper.absoluteVec(Vec3(8.5, 5.5, 4.5))
         val length = 4.0
         val thickness = 0.1
-        work.sweep(SweptVolume(start, start.add(0.0, 0.0, length), Vec3(thickness, thickness, thickness)))
+        work.cuts(listOf(SweptVolume(start, start.add(0.0, 0.0, length), Vec3(thickness, thickness, thickness))))
         helper.assertTrue(!work.advance(), "One visit must yield after examining one geometry candidate")
         helper.assertBlockPresent(Blocks.STONE, first)
         helper.succeedWhen {
@@ -87,15 +112,15 @@ class TerrainDestructionGameTest {
     @GameTest(environment = "cursed-oath-test:terrain", structure = "cursed-oath-test:arena", maxTicks = 100)
     fun removalBudgetAndQueuedCancellationAreBounded(helper: GameTestHelper) {
         val player = helper.caster()
-        val blocks = BlockPos.betweenClosed(BlockPos(5, 3, 7), BlockPos(11, 9, 13)).map { it.immutable() }
+        val blocks = BlockPos.betweenClosed(BlockPos(3, 2, 4), BlockPos(15, 14, 16)).map { it.immutable() }
         blocks.forEach { helper.setBlock(it, Blocks.DIRT) }
         val work = checkNotNull(TerrainDestruction.reserve(player))
-        val center = helper.absoluteVec(Vec3(8.0, 6.0, 10.0))
-        val radius = 5.0
+        val center = helper.absoluteVec(Vec3(9.0, 8.0, 10.0))
+        val radius = 9.0
         work.sphere(center, radius)
-        TerrainDestruction.tick(helper.level)
+        TerrainDestruction.tick()
         val removed = blocks.count { helper.getBlockState(it).isAir }
-        val writeBudget = 256
+        val writeBudget = TerrainDestruction.WRITES_PER_TICK
         helper.assertTrue(removed in 0..writeBudget, "A tick must stay within the direct block-removal budget")
         helper.assertTrue(!work.finished, "A large operation must wait across ticks")
         work.close()
@@ -142,7 +167,7 @@ class TerrainDestructionGameTest {
         val start = helper.absoluteVec(Vec3(8.5, 5.5, 4.5))
         val length = 4.0
         val thickness = 0.1
-        work.sweep(SweptVolume(start, start.add(0.0, 0.0, length), Vec3(thickness, thickness, thickness)))
+        work.cuts(listOf(SweptVolume(start, start.add(0.0, 0.0, length), Vec3(thickness, thickness, thickness))))
         var completions = 0
         work.onComplete = { completions++ }
         helper.succeedWhen {

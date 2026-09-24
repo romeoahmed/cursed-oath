@@ -1,6 +1,7 @@
 package io.github.romeoahmed.cursedoath.client
 
 import com.mojang.blaze3d.platform.NativeImage
+import com.mojang.blaze3d.systems.RenderSystem
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotComparisonAlgorithm
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotComparisonOptions
@@ -21,6 +22,10 @@ private val different =
     }
 
 internal fun ClientGameTestContext.prepareScreenshots() {
+    runOnClient<RuntimeException> {
+        val backend = RenderSystem.getDevice().deviceInfo.backendName()
+        check(backend == "Vulkan") { "Client tests require Vulkan; Minecraft selected $backend" }
+    }
     input.resizeWindow(WIDTH, HEIGHT)
 }
 
