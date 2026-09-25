@@ -62,12 +62,28 @@ class PurpleClientGameTest : FabricClientGameTest {
             world.server.runCommand("tick freeze")
             world.connection.waitForChunksRender()
             context.capture("purple-breached-wall")
+            captureFlight(context, world)
             world.server.runCommand("tick unfreeze")
             awaitWaveRemoval(context, world)
             context.waitTicks(DEBRIS_EXPIRY)
             context.capture("purple-tunnel-settled")
             verifyBlue(context, world)
         }
+    }
+
+    private fun captureFlight(
+        context: ClientGameTestContext,
+        world: TestSingleplayerContext,
+    ) {
+        world.server.runCommand("tp @a 18.5 -43 24.5 facing 0.5 -49 38.5")
+        world.connection.waitForClientboundPackets()
+        world.connection.waitForChunksRender()
+        context.capture("purple-flight-side")
+        world.server.runCommand("time set midnight")
+        world.connection.waitForClientboundPackets()
+        context.waitTicks(LIGHT_TRANSITION_TICKS)
+        context.capture("purple-flight-side-night")
+        world.server.runCommand("time set day")
     }
 
     private fun awaitWaveRemoval(
@@ -181,6 +197,7 @@ class PurpleClientGameTest : FabricClientGameTest {
 
     private companion object {
         val WALL_CENTER = BlockPos(0, -49, 10)
+        const val LIGHT_TRANSITION_TICKS = 20
         const val DEBRIS_EXPIRY = 40
         const val SEPARATION_TICKS = 10
         const val CHARGE_TICKS = 38

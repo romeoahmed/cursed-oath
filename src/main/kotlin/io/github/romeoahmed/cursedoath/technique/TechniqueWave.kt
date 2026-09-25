@@ -1,5 +1,6 @@
 package io.github.romeoahmed.cursedoath.technique
 
+import io.github.romeoahmed.cursedoath.domain.DomainInteractions
 import io.github.romeoahmed.cursedoath.world.SweptVolume
 import io.github.romeoahmed.cursedoath.world.TerrainDestruction
 import io.github.romeoahmed.cursedoath.world.hasLoadedChunks
@@ -24,6 +25,7 @@ class TechniqueWave(
     private var direction = Vec3.ZERO
     private var origin = Vec3.ZERO
     private var next: Vec3? = null
+    private var shellContact = false
     private var traveled = 0.0
     private val hit = HashSet<UUID>()
     private val size = Vec3(TechniqueTuning.DISMANTLE_WIDTH, 0.18, 0.18)
@@ -91,6 +93,7 @@ class TechniqueWave(
         if (destination != null) {
             val volume = SweptVolume(position(), destination, size)
             damage(level, player, volume)
+            if (isRemoved) return
             val obstruction =
                 level.clipIncludingBorder(
                     ClipContext(position(), destination, ClipContext.Block.COLLIDER, ClipContext.Fluid.ANY, this),
@@ -103,8 +106,9 @@ class TechniqueWave(
             traveled += destination.distanceTo(position())
             setPos(destination)
             next = null
+            if (shellContact) discard()
         }
-        schedule(level, work)
+        if (!isRemoved) schedule(level, work)
     }
 
     private fun schedule(
@@ -121,8 +125,12 @@ class TechniqueWave(
                 discard()
                 return
             }
-            next = end
-            work.cuts(listOf(SweptVolume(position(), end, size)), origin)
+            val barrier = DomainInteractions.contact(work.owner, position(), end)
+            val destination = barrier?.point ?: end
+            shellContact = barrier != null
+            if (barrier != null) barrier.domain.damageShell(SLASH_DAMAGE, !barrier.domain.contains(position()))
+            next = destination
+            work.cuts(listOf(SweptVolume(position(), destination, size)), origin)
         }
     }
 
@@ -135,6 +143,8 @@ class TechniqueWave(
         val bounds = volume.bounds.inflate(MOVEMENT_MARGIN)
         for (target in level.getEntitiesOfClass(LivingEntity::class.java, bounds)) {
             hitTarget(player, target, volume)
+            // Native damage callbacks can remove this wave and close its terrain reservation.
+            if (isRemoved) return
         }
     }
 
@@ -150,11 +160,12 @@ class TechniqueWave(
         }
         val movement = target.position().subtract(Vec3(target.xo, target.yo, target.zo))
         val contact = volume.contact(target.boundingBox, movement) ?: return
+        val source = volume.source(contact, origin)
         val level = player.level()
         val covered =
             level.clipIncludingBorder(
                 ClipContext(
-                    volume.source(contact, origin),
+                    source,
                     contact,
                     ClipContext.Block.COLLIDER,
                     ClipContext.Fluid.ANY,
@@ -162,6 +173,7 @@ class TechniqueWave(
                 ),
             )
         if (covered.type != HitResult.Type.MISS) return
+        if (DomainInteractions.contact(player, source, contact) != null) return
         hit.add(target.uuid)
         target.hurtServer(level, level.damageSources().playerAttack(player), SLASH_DAMAGE)
     }

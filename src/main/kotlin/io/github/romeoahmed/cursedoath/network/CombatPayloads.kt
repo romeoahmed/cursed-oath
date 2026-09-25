@@ -43,6 +43,9 @@ data class CombatSnapshot(
     val preparing: Int,
     val infinity: Boolean,
     val pulseReady: Boolean,
+    val burnout: Int = 0,
+    val simpleDomain: Int = 0,
+    val amplification: Boolean = false,
 ) : CustomPacketPayload {
     override fun type() = TYPE
 
@@ -66,6 +69,12 @@ data class CombatSnapshot(
                 CombatSnapshot::infinity,
                 ByteBufCodecs.BOOL,
                 CombatSnapshot::pulseReady,
+                ByteBufCodecs.VAR_INT,
+                CombatSnapshot::burnout,
+                ByteBufCodecs.VAR_INT,
+                CombatSnapshot::simpleDomain,
+                ByteBufCodecs.BOOL,
+                CombatSnapshot::amplification,
                 ::CombatSnapshot,
             )
     }

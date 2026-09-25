@@ -9,7 +9,6 @@ import net.minecraft.world.entity.SteppedInterpolationHandler
 import net.minecraft.world.entity.projectile.Projectile
 import net.minecraft.world.level.Level
 
-/** Native entity tracking is the single source of position, technique and lifetime for rendering. */
 sealed class TechniqueProjectile(
     type: EntityType<out TechniqueProjectile>,
     level: Level,

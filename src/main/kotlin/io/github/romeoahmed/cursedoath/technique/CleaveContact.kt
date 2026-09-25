@@ -1,5 +1,6 @@
 package io.github.romeoahmed.cursedoath.technique
 
+import io.github.romeoahmed.cursedoath.domain.DomainInteractions
 import io.github.romeoahmed.cursedoath.world.CleaveLattice
 import io.github.romeoahmed.cursedoath.world.TerrainDestruction
 import io.github.romeoahmed.cursedoath.world.hasLoadedChunks
@@ -21,6 +22,17 @@ internal object CleaveContact {
         work: TerrainDestruction.Work,
     ): Vec3? {
         val hit = TechniqueCombat.contact(player, RANGE)
+        val boundary =
+            DomainInteractions.contact(
+                player,
+                player.eyePosition,
+                hit?.location ?: player.eyePosition.add(player.lookAngle.scale(RANGE)),
+            )
+        if (boundary != null) {
+            boundary.domain.damageShell(TechniqueTuning.CLEAVE_DAMAGE, !boundary.domain.contains(player.eyePosition))
+            work.close()
+            return boundary.point
+        }
         if (hit == null || hit.type == HitResult.Type.MISS) {
             work.close()
             return null
@@ -54,8 +66,10 @@ internal object CleaveContact {
         lattice: CleaveLattice,
         target: LivingEntity,
     ): Boolean {
+        if (!TechniqueCombat.canAffect(player, target) || TechniqueCombat.hasInfinity(target)) return false
         return lattice.cuts.any { cut ->
             val contact = cut.contact(target.boundingBox) ?: return@any false
+            if (DomainInteractions.contact(player, lattice.center, contact) != null) return@any false
             val hit =
                 player.level().clipIncludingBorder(
                     ClipContext(
@@ -75,12 +89,13 @@ internal object CleaveContact {
         target: LivingEntity,
     ) {
         if (!TechniqueCombat.canAffect(player, target) || TechniqueCombat.hasInfinity(target)) return
-        val damage =
-            (
-                TechniqueTuning.CLEAVE_DAMAGE + target.armorValue * ARMOR_SCALING +
-                    target.maxHealth * HEALTH_SCALING
-            ).coerceAtMost(TechniqueTuning.CLEAVE_MAX_DAMAGE)
         val level = player.level()
-        target.hurtServer(level, level.damageSources().playerAttack(player), damage)
+        target.hurtServer(level, level.damageSources().playerAttack(player), damageAmount(target))
     }
+
+    fun damageAmount(target: LivingEntity): Float =
+        (
+            TechniqueTuning.CLEAVE_DAMAGE + target.armorValue * ARMOR_SCALING +
+                target.maxHealth * HEALTH_SCALING
+        ).coerceAtMost(TechniqueTuning.CLEAVE_MAX_DAMAGE)
 }

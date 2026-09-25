@@ -3,7 +3,7 @@
 	"id": "cursed-oath",
 	"version": "${version}",
 	"name": "Cursed Oath",
-	"description": "Jujutsu combat in Minecraft. Development prototype.",
+	"description": "A Minecraft combat prototype inspired by Jujutsu Kaisen.",
 	"license": "MPL-2.0",
 	"icon": "assets/cursed-oath/icon.png",
 	"environment": "*",

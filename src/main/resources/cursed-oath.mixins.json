@@ -1,12 +1,19 @@
 {
-	"required": true,
-	"package": "io.github.romeoahmed.cursedoath.mixin",
-	"compatibilityLevel": "JAVA_25",
-	"mixins": [
-		"PlayerAttackMixin",
-		"ServerPunchMixin"
-	],
-	"injectors": {
-		"defaultRequire": 1
-	}
+  "required": true,
+  "package": "io.github.romeoahmed.cursedoath.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [
+    "PlayerAttackMixin",
+    "ServerPunchMixin",
+    "DomainMovementMixin",
+    "DomainPlayerMovementMixin",
+    "DomainImmobilityMixin",
+    "ProjectileDefenseMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "client": [
+    "DomainEnvironmentMixin"
+  ]
 }

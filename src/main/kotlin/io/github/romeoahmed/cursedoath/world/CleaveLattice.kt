@@ -7,7 +7,7 @@ import kotlin.math.abs
 
 /** The same finite cutting planes drive terrain, entity contact and the client grid. */
 internal class CleaveLattice(
-    center: Vec3,
+    val center: Vec3,
     direction: Vec3,
 ) {
     private val forward = direction.normalize()
@@ -23,8 +23,6 @@ internal class CleaveLattice(
             )
         }
     val bounds: AABB = cuts.map { it.bounds }.reduce(AABB::minmax)
-
-    fun intersects(box: AABB): Boolean = cuts.any { it.entry(box) != null }
 
     private fun cut(
         start: Vec3,

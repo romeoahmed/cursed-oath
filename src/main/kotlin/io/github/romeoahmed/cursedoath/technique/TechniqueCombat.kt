@@ -1,6 +1,7 @@
 package io.github.romeoahmed.cursedoath.technique
 
 import io.github.romeoahmed.cursedoath.combat.CombatRuntime
+import io.github.romeoahmed.cursedoath.domain.Domains
 import io.github.romeoahmed.cursedoath.network.TechniqueEvent
 import io.github.romeoahmed.cursedoath.world.TerrainDestruction
 import io.github.romeoahmed.cursedoath.world.hasLoadedChunks
@@ -40,6 +41,7 @@ object TechniqueCombat {
             return
         }
         event(player, id, technique, TechniqueEvent.RELEASE, end)
+        if (technique.domain) return
         val sound =
             when (technique) {
                 Technique.BLUE -> SoundEvents.BEACON_ACTIVATE
@@ -71,7 +73,11 @@ object TechniqueCombat {
                 player.position().add(0.0, 1.0, 0.0)
             }
 
-            Technique.INFINITY -> {
+            Technique.UNLIMITED_VOID, Technique.MALEVOLENT_SHRINE -> {
+                Domains.open(player, technique).position()
+            }
+
+            Technique.INFINITY, Technique.SIMPLE_DOMAIN, Technique.AMPLIFICATION -> {
                 null
             }
         }

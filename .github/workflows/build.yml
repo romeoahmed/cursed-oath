@@ -26,6 +26,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
       - name: build
         run: ./gradlew build
+      - name: verify model export
+        run: |
+          python3 -m unittest discover -s art/shrine
+          python3 art/shrine/export.py --check
       - name: install Vulkan runtime
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb xauth mesa-vulkan-drivers
       - name: Vulkan client game tests

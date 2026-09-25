@@ -1,6 +1,6 @@
 package io.github.romeoahmed.cursedoath.combat
 
-/** Integer units keep reservations exact. Only the server owns this ledger. */
+/** Integer units keep server-side energy reservations exact. */
 data class CursedEnergy(
     val current: Int = CAPACITY,
     val reserved: Int = 0,

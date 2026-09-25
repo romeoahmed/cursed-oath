@@ -1,6 +1,10 @@
 package io.github.romeoahmed.cursedoath.client.render
 
+import com.mojang.blaze3d.vertex.PoseStack
 import io.github.romeoahmed.cursedoath.client.animation.CastingAnimation
+import io.github.romeoahmed.cursedoath.client.render.limitless.BlueDebris
+import io.github.romeoahmed.cursedoath.client.render.limitless.EnergyTrails
+import io.github.romeoahmed.cursedoath.client.render.limitless.LimitlessEffects
 import io.github.romeoahmed.cursedoath.network.TechniqueEvent
 import io.github.romeoahmed.cursedoath.technique.Technique
 import io.github.romeoahmed.cursedoath.technique.TechniqueOrb
@@ -12,6 +16,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.level.LevelExtractionEvents
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ClientLevel
+import net.minecraft.client.renderer.SubmitNodeCollector
 import net.minecraft.world.entity.Avatar
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
@@ -23,7 +28,6 @@ object TechniqueVisuals {
     private const val MAX_SEEN = 512
     private const val IMPACT_DURATION = 16
     private const val HAND_DISTANCE = 1.2
-    private const val CHARGE_DISTANCE = 4.0
     private const val MAX_DISTANCE_SQUARED = 128.0 * 128.0
     private const val EFFECT_SIZE = 32.0
 
@@ -37,7 +41,6 @@ object TechniqueVisuals {
         val position: Vec3,
         val direction: Vec3,
         val technique: Technique,
-        val age: Float,
         val progress: Float,
         val stage: Int,
     )
@@ -52,7 +55,7 @@ object TechniqueVisuals {
         ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register { _, _ -> clear() }
         ClientEntityEvents.ENTITY_LOAD.register { entity, _ -> if (entity is TechniqueOrb) orbs.add(entity) }
         ClientEntityEvents.ENTITY_UNLOAD.register { entity, _ -> if (entity is TechniqueOrb) orbs.remove(entity) }
-        val renderType = TechniqueRenderTypes.additive
+        val renderType = EffectRenderTypes.additive
         LevelExtractionEvents.END_EXTRACTION.register { context ->
             val partial = context.deltaTracker().getGameTimeDeltaPartialTick(false)
             val time = context.level().gameTime.toDouble() + partial
@@ -78,38 +81,55 @@ object TechniqueVisuals {
                 val pose = context.poseStack()
                 pose.pushPose()
                 pose.translate(shape.position.x - camera.x, shape.position.y - camera.y, shape.position.z - camera.z)
-                context.submitNodeCollector().submitCustomGeometry(pose, renderType) { matrix, vertices ->
-                    val mesh =
-                        TechniqueGeometry(
-                            matrix,
-                            vertices,
-                            detail = TechniqueGeometry.detail(shape.position.distanceToSqr(camera)),
-                        )
-                    if (shape.stage == TechniqueEvent.PREPARE) {
-                        mesh.charge(shape.technique, shape.progress, shape.direction)
-                    } else if (shape.stage == TechniqueEvent.BLACK_FLASH) {
-                        ShrineGeometry(TechniqueMesh(matrix, vertices)).blackFlash(shape.direction, shape.progress)
-                    } else {
-                        mesh.draw(shape.technique, shape.age, shape.progress, shape.direction)
-                    }
-                }
-                if (shape.stage == TechniqueEvent.IMPACT && shape.technique == Technique.RED) {
-                    context.submitNodeCollector().submitCustomGeometry(
+                val collector = context.submitNodeCollector()
+                if (shape.stage == TechniqueEvent.PREPARE) {
+                    LimitlessEffects.submit(
                         pose,
-                        TechniqueRenderTypes.core,
-                    ) { matrix, vertices ->
-                        TechniqueGeometry(matrix, vertices).core(shape.technique, shape.progress)
+                        collector,
+                        LimitlessEffects.charge(shape.technique, shape.progress, shape.direction),
+                    )
+                } else {
+                    collector.submitCustomGeometry(pose, renderType) { matrix, vertices ->
+                        when (shape.stage) {
+                            TechniqueEvent.IMPACT -> {
+                                EnergyTrails(matrix, vertices).impact(shape.progress)
+                            }
+
+                            TechniqueEvent.BLACK_FLASH -> {
+                                StrikeGeometry(EffectMesh(matrix, vertices))
+                                    .blackFlash(shape.direction, shape.progress)
+                            }
+
+                            else -> {
+                                TechniqueGeometry(matrix, vertices)
+                                    .draw(shape.technique, shape.progress, shape.direction)
+                            }
+                        }
                     }
+                    drawCore(pose, collector, shape)
                 }
                 pose.popPose()
             }
         }
     }
 
+    private fun drawCore(
+        pose: PoseStack,
+        collector: SubmitNodeCollector,
+        shape: Shape,
+    ) {
+        if (shape.stage != TechniqueEvent.BLACK_FLASH) return
+        collector.submitCustomGeometry(pose, EffectRenderTypes.core) { matrix, vertices ->
+            StrikeGeometry(EffectMesh(matrix, vertices, maxAlpha = 255))
+                .blackFlash(shape.direction, shape.progress, core = true)
+        }
+    }
+
     private fun tickDebris(client: Minecraft) {
+        if (client.isPaused) return
         var remaining = MAX_DEBRIS_FIELDS
         for (orb in orbs) {
-            if (orb.technique == Technique.BLUE && TechniqueDebris.blue(client, orb.position())) {
+            if (orb.technique == Technique.BLUE && BlueDebris.emit(client, orb.position())) {
                 if (--remaining == 0) break
             }
         }
@@ -127,13 +147,12 @@ object TechniqueVisuals {
             actor?.getViewVector(partial) ?: effect.event.destination
                 .subtract(effect.event.origin)
                 .normalize()
-        val distance = if (effect.technique == Technique.PURPLE) CHARGE_DISTANCE else HAND_DISTANCE
+        val distance = if (effect.technique == Technique.PURPLE) LimitlessEffects.CHARGE_DISTANCE else HAND_DISTANCE
         val position = actor?.getEyePosition(partial)?.add(direction.scale(distance)) ?: effect.event.destination
         return Shape(
             position,
             direction,
             effect.technique,
-            age,
             (age / effect.duration).coerceIn(0f, 1f),
             effect.event.stage,
         )

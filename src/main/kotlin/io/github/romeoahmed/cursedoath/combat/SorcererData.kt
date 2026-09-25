@@ -10,6 +10,9 @@ data class SorcererProfile(
     val version: Int = 1,
     val practice: Boolean = false,
     val reversal: Boolean = false,
+    val selfHealing: Boolean = reversal,
+    val barriers: Boolean = practice,
+    val domainRadius: Double = 96.0,
 ) {
     companion object {
         val CODEC: Codec<SorcererProfile> =
@@ -19,15 +22,33 @@ data class SorcererProfile(
                         Codec.intRange(1, 1).fieldOf("version").forGetter(SorcererProfile::version),
                         Codec.BOOL.fieldOf("practice").forGetter(SorcererProfile::practice),
                         Codec.BOOL.fieldOf("reversal").forGetter(SorcererProfile::reversal),
-                    ).apply(instance, ::SorcererProfile)
+                        Codec.BOOL.optionalFieldOf("self_healing").forGetter { java.util.Optional.of(it.selfHealing) },
+                        Codec.BOOL.optionalFieldOf("barriers").forGetter { java.util.Optional.of(it.barriers) },
+                        Codec
+                            .doubleRange(
+                                16.0,
+                                200.0,
+                            ).optionalFieldOf("domain_radius", 96.0)
+                            .forGetter(SorcererProfile::domainRadius),
+                    ).apply(instance) { version, practice, reversal, healing, barriers, radius ->
+                        SorcererProfile(
+                            version,
+                            practice,
+                            reversal,
+                            healing.orElse(reversal),
+                            barriers.orElse(practice),
+                            radius,
+                        )
+                    }
             }
     }
 }
 
-/** Persist the balance and recovery; active casts and their reservations do not survive reloads. */
+/** Balance, recovery, and burnout persist; active casts and reservations do not. */
 data class SorcererResources(
     val energy: Int = CursedEnergy.CAPACITY,
     val recovery: Int = 0,
+    val burnout: Int = 0,
 ) {
     companion object {
         val CODEC: Codec<SorcererResources> =
@@ -36,6 +57,7 @@ data class SorcererResources(
                     .group(
                         Codec.intRange(0, CursedEnergy.CAPACITY).fieldOf("energy").forGetter(SorcererResources::energy),
                         Codec.intRange(0, 1200).fieldOf("recovery").forGetter(SorcererResources::recovery),
+                        Codec.intRange(0, 1200).optionalFieldOf("burnout", 0).forGetter(SorcererResources::burnout),
                     ).apply(instance, ::SorcererResources)
             }
     }

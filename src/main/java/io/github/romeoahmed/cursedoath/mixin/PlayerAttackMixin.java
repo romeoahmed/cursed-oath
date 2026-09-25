@@ -6,6 +6,7 @@ import com.llamalad7.mixinextras.sugar.Share;
 import com.llamalad7.mixinextras.sugar.ref.LocalBooleanRef;
 import io.github.romeoahmed.cursedoath.combat.CombatRuntime;
 import io.github.romeoahmed.cursedoath.combat.MeleeDamage;
+import io.github.romeoahmed.cursedoath.technique.InfinityDefense;
 import io.github.romeoahmed.cursedoath.technique.TechniqueCombat;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
@@ -44,7 +45,7 @@ abstract class PlayerAttackMixin {
         if (!ready.get()
                 || !(target instanceof LivingEntity living)
                 || !TechniqueCombat.INSTANCE.canAffect(player, living)
-                || (target instanceof ServerPlayer defender && CombatRuntime.INSTANCE.hasInfinity(defender))) {
+                || (target instanceof ServerPlayer defender && InfinityDefense.INSTANCE.blocks(defender, source))) {
             return original.call(target, source, damage);
         }
         boolean blackFlash = player.getRandom().nextFloat() < 0.2f;

@@ -8,23 +8,28 @@ import kotlin.math.sqrt
 /** Exact sphere/AABB contact: between box-face crossings, squared distance is quadratic. */
 internal class SphereSweep(
     private val start: Vec3,
-    end: Vec3,
+    private val end: Vec3,
     radius: Double,
 ) {
     private val path = AABB(start, end)
     private val motion = end.subtract(start)
     private val radiusSquared = radius * radius
 
+    // Queries run sequentially on the owning server thread, including queued terrain segments.
+    private val times = DoubleArray(MAX_CROSSINGS)
+
     fun entry(box: AABB): Double? {
         if (box.distanceToSqr(path) > radiusSquared) return null
         if (box.distanceToSqr(start) <= radiusSquared) return 0.0
-        val times = crossings(box)
-        return (0 until times.lastIndex).firstNotNullOfOrNull { contact(box, times[it], times[it + 1]) }
+        val count = crossings(box)
+        return (0 until count - 1).firstNotNullOfOrNull {
+            if (times[it] == times[it + 1]) null else contact(box, times[it], times[it + 1])
+        } ?: 1.0.takeIf { box.distanceToSqr(end) <= radiusSquared }
     }
 
-    private fun crossings(box: AABB): DoubleArray {
-        val times = DoubleArray(MAX_CROSSINGS) { 1.0 }
+    private fun crossings(box: AABB): Int {
         times[0] = 0.0
+        times[1] = 1.0
         var count = 2
         for (axis in Direction.Axis.entries) {
             val speed = motion.get(axis)
@@ -35,8 +40,8 @@ internal class SphereSweep(
                 if (time > 0.0 && time < 1.0) times[count++] = time
             }
         }
-        times.sort()
-        return times
+        times.sort(0, count)
+        return count
     }
 
     private companion object {
@@ -48,23 +53,30 @@ internal class SphereSweep(
         low: Double,
         high: Double,
     ): Double? {
-        val at = start.add(motion.scale(low))
-        val c = box.distanceToSqr(at) - radiusSquared
-        if (c <= 0.0) return low
-        val middle = start.add(motion.scale((low + high) / 2))
+        val middle = (low + high) / 2
         var a = 0.0
         var b = 0.0
+        var distanceSquared = 0.0
         for (axis in Direction.Axis.entries) {
-            val coordinate = middle.get(axis)
+            val origin = start.get(axis)
+            val speed = motion.get(axis)
+            val at = origin + speed * low
+            val distance = at - at.coerceIn(box.min(axis), box.max(axis))
+            distanceSquared += distance * distance
+            val coordinate = origin + speed * middle
             if (coordinate >= box.min(axis) && coordinate <= box.max(axis)) continue
             val face = coordinate.coerceIn(box.min(axis), box.max(axis))
-            val speed = motion.get(axis)
             a += speed * speed
-            b += (at.get(axis) - face) * speed
+            b += (at - face) * speed
         }
+        val c = distanceSquared - radiusSquared
+        if (c <= 0.0) return low
         val discriminant = b * b - a * c
-        if (a == 0.0 || discriminant < 0.0) return null
-        val offset = (-b - sqrt(discriminant)) / a
-        return (low + offset).takeIf { offset >= 0.0 && offset <= high - low }
+        return if (a == 0.0 || discriminant < 0.0) {
+            null
+        } else {
+            val offset = (-b - sqrt(discriminant)) / a
+            (low + offset).takeIf { offset >= 0.0 && offset <= high - low }
+        }
     }
 }

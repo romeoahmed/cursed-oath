@@ -10,6 +10,15 @@ import kotlin.test.assertTrue
 
 class SweptVolumeTest {
     @Test
+    fun `a stationary box retains its extent without contacting unrelated targets`() {
+        val center = Vec3(4.0, 2.0, -3.0)
+        val volume = SweptVolume(center, center, Vec3(2.0, 0.5, 0.25))
+        assertEquals(AABB.ofSize(center, 4.0, 1.0, 0.5), volume.bounds)
+        assertEquals(0.0, volume.entry(AABB.ofSize(center, 0.1, 0.1, 0.1)))
+        assertNull(volume.entry(AABB.ofSize(center.add(0.0, 2.0, 0.0), 0.1, 0.1, 0.1)))
+    }
+
+    @Test
     fun `horizontal cut is wide but does not reach the layer above`() {
         val cut = SweptVolume(Vec3.ZERO, Vec3(0.0, 0.0, 8.0), Vec3(2.5, 0.18, 0.18))
         assertNotNull(cut.entry(AABB(2.0, -0.1, 4.0, 3.0, 0.1, 5.0)))
@@ -61,13 +70,16 @@ class SweptVolumeTest {
     @Test
     fun `lattice covers every line symmetrically and preserves gaps`() {
         val grid = CleaveLattice(Vec3.ZERO, Vec3(0.0, 0.0, 1.0))
+
+        fun intersects(box: AABB) = grid.cuts.any { it.entry(box) != null }
+
         for (offset in -6..6 step 2) {
-            assertTrue(grid.intersects(AABB.ofSize(Vec3(offset.toDouble(), 1.0, 4.0), 0.1, 0.1, 0.1)))
-            assertTrue(grid.intersects(AABB.ofSize(Vec3(1.0, offset.toDouble(), 4.0), 0.1, 0.1, 0.1)))
+            assertTrue(intersects(AABB.ofSize(Vec3(offset.toDouble(), 1.0, 4.0), 0.1, 0.1, 0.1)))
+            assertTrue(intersects(AABB.ofSize(Vec3(1.0, offset.toDouble(), 4.0), 0.1, 0.1, 0.1)))
         }
-        assertNull(grid.cuts.first().entry(AABB.ofSize(Vec3(0.0, 0.0, 10.0), 0.1, 0.1, 0.1)))
-        assertTrue(!grid.intersects(AABB.ofSize(Vec3(1.0, 1.0, 4.0), 0.5, 0.5, 0.5)))
-        assertTrue(!grid.intersects(AABB.ofSize(Vec3(8.0, 0.0, 4.0), 0.5, 0.5, 0.5)))
+        assertTrue(!intersects(AABB.ofSize(Vec3(0.0, 0.0, 10.0), 0.1, 0.1, 0.1)))
+        assertTrue(!intersects(AABB.ofSize(Vec3(1.0, 1.0, 4.0), 0.5, 0.5, 0.5)))
+        assertTrue(!intersects(AABB.ofSize(Vec3(8.0, 0.0, 4.0), 0.5, 0.5, 0.5)))
     }
 
     @Test

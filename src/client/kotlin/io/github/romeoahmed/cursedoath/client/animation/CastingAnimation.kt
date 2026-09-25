@@ -9,7 +9,7 @@ import io.github.romeoahmed.cursedoath.CursedOath
 import io.github.romeoahmed.cursedoath.technique.Technique
 import net.minecraft.world.entity.Avatar
 
-/** Client-only PAL adapter; animation does not drive damage or movement. */
+/** PAL playback follows confirmed cast stages; it does not drive simulation. */
 object CastingAnimation {
     private const val LAYER_PRIORITY = 1500
     private val layer = CursedOath.id("casting")
@@ -36,7 +36,9 @@ object CastingAnimation {
                 Technique.DISMANTLE -> "dismantle"
                 Technique.CLEAVE -> "cleave"
                 Technique.HEAL -> "seal"
-                Technique.INFINITY -> return
+                Technique.UNLIMITED_VOID -> "void"
+                Technique.MALEVOLENT_SHRINE -> "shrine"
+                Technique.INFINITY, Technique.SIMPLE_DOMAIN, Technique.AMPLIFICATION -> return
             }
         controller(player)?.triggerAnimation(CursedOath.id(if (release) "${name}_release" else name), elapsedTicks)
     }

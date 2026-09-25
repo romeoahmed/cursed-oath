@@ -26,4 +26,17 @@ class RequestGateTest {
         assertFalse(gate.accept(gate.session, 4, 2))
         assertTrue(gate.accept(gate.session, 5, 2))
     }
+
+    @Test
+    fun `invalid traffic cannot consume a valid connection budget or advance its sequence`() {
+        val gate = RequestGate()
+        repeat(10) {
+            assertFalse(gate.accept(UUID.randomUUID(), Long.MAX_VALUE, 1))
+            assertFalse(gate.accept(gate.session, -1, 1))
+        }
+        repeat(4) { assertTrue(gate.accept(gate.session, it.toLong(), 1)) }
+        assertTrue(gate.accept(gate.session, Long.MAX_VALUE, 2))
+        assertFalse(gate.accept(gate.session, Long.MAX_VALUE, 3))
+        assertFalse(gate.accept(gate.session, 0, 3))
+    }
 }

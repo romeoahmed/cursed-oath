@@ -1,0 +1,38 @@
+{
+  "domain_open": {
+    "subtitle": "subtitles.cursed-oath.domain_open",
+    "sounds": [
+      {
+        "name": "minecraft:block.end_portal.spawn",
+        "type": "event"
+      }
+    ]
+  },
+  "domain_close": {
+    "subtitle": "subtitles.cursed-oath.domain_close",
+    "sounds": [
+      {
+        "name": "minecraft:block.beacon.deactivate",
+        "type": "event"
+      }
+    ]
+  },
+  "shrine_cut": {
+    "subtitle": "subtitles.cursed-oath.shrine_cut",
+    "sounds": [
+      {
+        "name": "minecraft:entity.player.attack.sweep",
+        "type": "event"
+      }
+    ]
+  },
+  "barrier_break": {
+    "subtitle": "subtitles.cursed-oath.barrier_break",
+    "sounds": [
+      {
+        "name": "minecraft:block.glass.break",
+        "type": "event"
+      }
+    ]
+  }
+}

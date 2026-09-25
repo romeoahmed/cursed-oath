@@ -1,7 +1,8 @@
 package io.github.romeoahmed.cursedoath.combat
 
+import io.github.romeoahmed.cursedoath.domain.BarrierState
+import io.github.romeoahmed.cursedoath.domain.Domains
 import io.github.romeoahmed.cursedoath.network.TechniqueEvent
-import io.github.romeoahmed.cursedoath.technique.InfinityDefense
 import io.github.romeoahmed.cursedoath.technique.Technique
 import io.github.romeoahmed.cursedoath.technique.TechniqueCombat
 import io.github.romeoahmed.cursedoath.world.TerrainDestruction
@@ -27,38 +28,32 @@ internal class Fighter(
         private set
     var cast: Cast? = null
         private set
-    var infinity = false
+    val defense = Defense(player)
+    val infinity: Boolean get() = defense.infinity
+    var burnout = saved.burnout
         private set
     private var pulseAt: Long? = null
     val pulseReady: Boolean
         get() = pulseAt?.let { player.level().gameTime - it in 0..PULSE_WINDOW } == true
-    private val canPrepare: Boolean
-        get() =
-            player.isAlive && !player.isSpectator &&
-                !player.isUsingItem && !player.isPassenger && !player.isFallFlying && !player.isSwimming
 
     fun prepare(technique: Technique) {
+        if (technique.domain && Domains.ownedBy(player) != null) {
+            Domains.cancel(player)
+            return
+        }
+        if (technique == Technique.SIMPLE_DOMAIN || technique == Technique.AMPLIFICATION) {
+            prepareDefense(technique)
+            return
+        }
         if (technique == Technique.INFINITY && infinity) {
-            infinity = false
+            defense.infinity = false
         } else {
-            val rejection = rejection(technique)
+            val rejection = CastRules.rejection(this, technique)
             when {
                 rejection != null -> player.sendOverlayMessage(Component.translatable("message.cursed-oath.$rejection"))
-                technique == Technique.INFINITY -> infinity = true
+                technique == Technique.INFINITY -> defense.infinity = true
                 else -> beginCast(technique)
             }
-        }
-    }
-
-    private fun rejection(technique: Technique): String? {
-        val reversal = player.getAttachedOrCreate(SorcererData.PROFILE).reversal
-        return when {
-            cast != null || recovery > 0 -> "busy"
-            !canPrepare -> "hands"
-            technique.requiresReversal && !reversal -> "qualification"
-            technique == Technique.HEAL && player.health >= player.maxHealth -> "healthy"
-            technique == Technique.INFINITY && energy.available < INFINITY_COST -> "energy"
-            else -> null
         }
     }
 
@@ -83,8 +78,22 @@ internal class Fighter(
         }
     }
 
+    private fun prepareDefense(technique: Technique) {
+        if (!player.isAlive || player.isSpectator || Domains.isOverloaded(player)) return
+        if (!player.getAttachedOrCreate(SorcererData.PROFILE).barriers) return
+        energy = defense.toggle(technique, energy)
+        if (defense.amplification) cancelPreparation()
+        persist()
+    }
+
+    fun imposeBurnout(ticks: Int) {
+        burnout = maxOf(burnout, ticks)
+        if (Domains.ownedBy(player) == null) defense.infinity = false
+        persist()
+    }
+
     fun preparePulse() {
-        if (!canPrepare || cast != null || pulseReady) return
+        if (!CastRules.available(player, Technique.CLEAVE) || cast != null || pulseReady) return
         energy = energy.spend(PULSE_COST) ?: return
         pulseAt = player.level().gameTime
         persist()
@@ -103,24 +112,19 @@ internal class Fighter(
             return
         }
         if (recovery > 0) recovery--
+        if (burnout > 0 && Domains.ownedBy(player) == null) burnout--
         if (pulseAt?.let { player.level().gameTime - it > PULSE_WINDOW } == true) pulseAt = null
-        if (infinity) {
-            val next = energy.spend(INFINITY_COST)
-            infinity = next != null
-            if (next != null) {
-                energy = next
-                InfinityDefense.interceptProjectiles(player)
-            }
-        }
+        energy = defense.tick(energy)
         advanceCast()
-        if (cast == null && recovery == 0 && !infinity) energy = energy.recover(RECOVERY_PER_TICK)
+        val resting = cast == null && recovery == 0 && !defense.sustained
+        if (resting && Domains.ownedBy(player) == null) energy = energy.recover(RECOVERY_PER_TICK)
         persist()
     }
 
     private fun advanceCast() {
         val active = cast ?: return
-        val qualified = !active.technique.requiresReversal || player.getAttachedOrCreate(SorcererData.PROFILE).reversal
-        if (!canPrepare || !qualified || active.terrain?.finished == true) {
+        val available = CastRules.available(player, active.technique) && CastRules.qualified(player, active.technique)
+        if (!available || active.terrain?.finished == true) {
             cancel()
         } else if (--active.remaining <= 0) {
             energy = energy.release(active.technique.cost.release)
@@ -130,27 +134,33 @@ internal class Fighter(
         }
     }
 
-    fun cancel() {
+    private fun cancelPreparation() {
         cast?.let {
             it.terrain?.close()
             energy = energy.cancel(it.technique.cost.release)
             TechniqueCombat.event(player, it.id, it.technique, TechniqueEvent.CANCEL, player.eyePosition)
         }
         cast = null
-        infinity = false
         pulseAt = null
         persist()
     }
 
+    fun cancel() {
+        cancelPreparation()
+        defense.clear()
+        Domains.cancel(player)
+        persist()
+    }
+
     private fun persist() {
-        val value = SorcererResources(energy.current, recovery)
+        BarrierState.update(player, if (defense.amplification) -1 else defense.simple)
+        val value = SorcererResources(energy.current, recovery, burnout)
         if (player.getAttached(SorcererData.RESOURCES) != value) player.setAttached(SorcererData.RESOURCES, value)
     }
 
     private companion object {
         const val PULSE_COST = 5
         const val PULSE_WINDOW = 60L
-        const val INFINITY_COST = 2
         const val RECOVERY_PER_TICK = 2
     }
 }

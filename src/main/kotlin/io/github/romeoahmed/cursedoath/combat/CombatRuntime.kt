@@ -1,5 +1,6 @@
 package io.github.romeoahmed.cursedoath.combat
 
+import io.github.romeoahmed.cursedoath.domain.Domains
 import io.github.romeoahmed.cursedoath.network.CastRequest
 import io.github.romeoahmed.cursedoath.network.CombatSnapshot
 import io.github.romeoahmed.cursedoath.network.RequestGate
@@ -49,7 +50,7 @@ object CombatRuntime {
         ServerLivingEntityEvents.AFTER_DAMAGE.register { entity, _, _, amount, _ ->
             if (entity is ServerPlayer && amount > 0) {
                 val fighter = worlds[entity.level()]?.get(entity.uuid)
-                if (fighter?.cast != null) {
+                if (fighter?.cast != null && fighter.cast?.technique?.domain != true) {
                     fighter.cancel()
                     sync(fighter)
                 }
@@ -65,7 +66,8 @@ object CombatRuntime {
         }
         ServerLivingEntityEvents.ALLOW_DAMAGE.register { entity, source, _ ->
             val player = entity as? ServerPlayer
-            player == null || !InfinityDefense.blocks(player, source)
+            source.entity?.let(Domains::isOverloaded) != true &&
+                (player == null || !InfinityDefense.blocks(player, source))
         }
         ServerTickEvents.END_LEVEL_TICK.register(::tick)
         ServerLifecycleEvents.SERVER_STOPPED.register {
@@ -76,7 +78,7 @@ object CombatRuntime {
         }
     }
 
-    private fun fighter(player: ServerPlayer): Fighter {
+    internal fun fighter(player: ServerPlayer): Fighter {
         // A dimension transfer may retain the same player instance; retire its old world state first.
         for ((world, fighters) in worlds) {
             if (world !== player.level()) fighters.remove(player.uuid)?.cancel()
@@ -101,6 +103,8 @@ object CombatRuntime {
 
     fun hasInfinity(player: ServerPlayer): Boolean =
         worlds[player.level()]?.get(player.uuid)?.infinity == true && player.isAlive && !player.isSpectator
+
+    internal fun fighters(level: ServerLevel): Collection<Fighter> = worlds[level]?.values ?: emptyList()
 
     private fun request(
         player: ServerPlayer,
@@ -156,6 +160,10 @@ object CombatRuntime {
                 fighter.cast?.technique?.wireId ?: 0,
                 fighter.infinity,
                 fighter.pulseReady,
+                // Burnout is already reserved while a domain is active, but does not yet block techniques.
+                if (Domains.ownedBy(player) == null) fighter.burnout else 0,
+                fighter.defense.simple,
+                fighter.defense.amplification,
             )
         if (snapshots.put(player.uuid, snapshot) != snapshot) ServerPlayNetworking.send(player, snapshot)
     }

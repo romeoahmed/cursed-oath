@@ -39,7 +39,6 @@ class ProjectileClientGameTest : FabricClientGameTest {
         world: TestSingleplayerContext,
         technique: Technique,
     ) {
-        context.waitTicks(POSE_EXPIRY)
         world.server.runOnServer<RuntimeException> {
             TechniqueCombat.release(world.connection.serverPlayer, UUID.randomUUID(), technique)
         }
@@ -106,10 +105,12 @@ class ProjectileClientGameTest : FabricClientGameTest {
                 }
                 context.waitTicks(RELEASE_TICKS)
                 context.capture("${technique.name.lowercase()}-release-pose")
-                context.waitTicks(POSE_EXPIRY)
             }
         } finally {
-            context.runOnClient<RuntimeException> { it.options.setCameraType(original) }
+            context.runOnClient<RuntimeException> {
+                CastingAnimation.stop(checkNotNull(it.player))
+                it.options.setCameraType(original)
+            }
         }
     }
 
@@ -119,6 +120,5 @@ class ProjectileClientGameTest : FabricClientGameTest {
         const val DEBRIS_EXPIRY = 40
         const val POSE_TICKS = 4
         const val RELEASE_TICKS = 2
-        const val POSE_EXPIRY = 20
     }
 }

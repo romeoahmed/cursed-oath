@@ -1,5 +1,6 @@
 package io.github.romeoahmed.cursedoath.technique
 
+import io.github.romeoahmed.cursedoath.domain.DomainInteractions
 import io.github.romeoahmed.cursedoath.network.TechniqueEvent
 import io.github.romeoahmed.cursedoath.world.TerrainDestruction
 import io.github.romeoahmed.cursedoath.world.hasLoadedChunks
@@ -93,6 +94,14 @@ class TechniqueOrb(
                     true,
                 ).minByOrNull { it.location.distanceToSqr(position()) }
         val hit = entity ?: block
+        val barrier = DomainInteractions.contact(player, position(), hit.location)
+        if (barrier != null) {
+            val power = if (technique == Technique.BLUE) TechniqueTuning.BLUE_OUTPUT else TechniqueTuning.RED_DAMAGE
+            barrier.domain.damageShell(power, !barrier.domain.contains(position()))
+            setPos(barrier.point.subtract(direction.scale(SURFACE_OFFSET)))
+            impact(player, work, direction)
+            return
+        }
         val center =
             if (hit.type == HitResult.Type.BLOCK) {
                 hit.location.subtract(direction.scale(SURFACE_OFFSET))

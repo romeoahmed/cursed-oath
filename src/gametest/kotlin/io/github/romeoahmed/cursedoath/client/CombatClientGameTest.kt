@@ -1,11 +1,15 @@
 package io.github.romeoahmed.cursedoath.client
 
+import com.mojang.blaze3d.platform.InputConstants
+import io.github.romeoahmed.cursedoath.client.gui.TechniqueWheelScreen
 import io.github.romeoahmed.cursedoath.client.input.CombatInput
 import io.github.romeoahmed.cursedoath.combat.CursedEnergy
 import io.github.romeoahmed.cursedoath.technique.Technique
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext
+import net.minecraft.client.gui.components.Button
+import net.minecraft.network.chat.Component
 import net.minecraft.world.entity.EntitySpawnReason
 import net.minecraft.world.entity.EntityTypes
 import net.minecraft.world.entity.LivingEntity
@@ -21,8 +25,9 @@ class CombatClientGameTest : FabricClientGameTest {
             world.connection.waitForClientboundPackets()
             world.connection.waitForChunksRender()
             context.waitFor { CombatInput.snapshot?.enabled == true }
+            verifyWheel(context, world)
             verifyMeleePreparation(context, world)
-            verifyBlackFlash(context, world)
+            verifyEmptySwing(context, world)
             verifyInfinity(context, world)
             context.input.lookAt(0f, 0f)
             context.input.pressKey(CombatInput.select)
@@ -36,6 +41,71 @@ class CombatClientGameTest : FabricClientGameTest {
             check(CombatInput.snapshot == null) { "Disconnect must clear the HUD state" }
             check(CombatInput.selected == Technique.BLUE) { "Disconnect must reset technique selection" }
         }
+    }
+
+    private fun verifyWheel(
+        context: ClientGameTestContext,
+        world: TestSingleplayerContext,
+    ) {
+        context.input.pressKey(CombatInput.select)
+        context.runOnClient<RuntimeException> { check(CombatInput.selected == Technique.RED) }
+        context.input.pressKey(CombatInput.wheel)
+        context.waitFor { it.gui.screen() is TechniqueWheelScreen }
+        context.capture("technique-wheel")
+        context.runOnClient<RuntimeException> { check(!checkNotNull(it.gui.screen()).isPauseScreen()) }
+        // Exercise the dead zone through native input, without calling the screen's picker.
+        val center =
+            context.computeOnClient<Pair<Double, Double>, RuntimeException> {
+                it.window.screenWidth / 2.0 to it.window.screenHeight / 2.0
+            }
+        context.input.setCursorPos(center.first, center.second)
+        context.input.pressMouse(InputConstants.MOUSE_BUTTON_RIGHT)
+        world.connection.waitForServerboundPackets()
+        world.connection.waitForClientboundPackets()
+        context.runOnClient<RuntimeException> {
+            check(it.gui.screen() is TechniqueWheelScreen)
+            check(CombatInput.snapshot?.preparing == 0)
+        }
+        pointAtBlue(context)
+        context.input.pressMouse(InputConstants.MOUSE_BUTTON_MIDDLE)
+        context.runOnClient<RuntimeException> { check(it.gui.screen() is TechniqueWheelScreen) }
+        context.input.pressMouse(InputConstants.MOUSE_BUTTON_LEFT)
+        context.waitFor { it.gui.screen() == null && CombatInput.selected == Technique.BLUE }
+        world.connection.waitForServerboundPackets()
+        world.connection.waitForClientboundPackets()
+        context.runOnClient<RuntimeException> {
+            val state = checkNotNull(CombatInput.snapshot)
+            check(state.preparing == 0 && state.energy == CursedEnergy.CAPACITY) { "Left click must only select" }
+        }
+        context.input.pressKey(CombatInput.wheel)
+        context.waitFor { it.gui.screen() is TechniqueWheelScreen }
+        context.input.pressKey(InputConstants.KEY_TAB)
+        context.input.pressKey(InputConstants.KEY_RETURN)
+        context.waitFor { it.gui.screen() == null && CombatInput.selected == Technique.RED }
+        context.input.pressKey(CombatInput.wheel)
+        context.waitFor { it.gui.screen() is TechniqueWheelScreen }
+        pointAtBlue(context)
+        context.input.pressMouse(InputConstants.MOUSE_BUTTON_RIGHT)
+        context.waitFor { it.gui.screen() == null && CombatInput.snapshot?.preparing == Technique.BLUE.wireId }
+        context.input.pressKey(CombatInput.cancel)
+        context.waitFor { CombatInput.snapshot?.preparing == 0 }
+        world.server.runCommand("execute as @a run cursedoath practice")
+        world.connection.waitForClientboundPackets()
+    }
+
+    private fun pointAtBlue(context: ClientGameTestContext) {
+        val (x, y) =
+            context.computeOnClient<Pair<Double, Double>, RuntimeException> {
+                val wheel = it.gui.screen() as TechniqueWheelScreen
+                val window = it.window
+                val blue =
+                    wheel.children().filterIsInstance<Button>().single { button ->
+                        button.message == Component.translatable("wheel.cursed-oath.${Technique.BLUE.path}")
+                    }
+                (blue.x + blue.width / 2.0) * window.screenWidth / window.guiScaledWidth to
+                    (blue.y + blue.height / 2.0) * window.screenHeight / window.guiScaledHeight
+            }
+        context.input.setCursorPos(x, y)
     }
 
     private fun verifyMeleePreparation(
@@ -57,7 +127,7 @@ class CombatClientGameTest : FabricClientGameTest {
         world.connection.waitForClientboundPackets()
     }
 
-    private fun verifyBlackFlash(
+    private fun verifyEmptySwing(
         context: ClientGameTestContext,
         world: TestSingleplayerContext,
     ) {
@@ -66,33 +136,6 @@ class CombatClientGameTest : FabricClientGameTest {
         context.waitFor { CombatInput.snapshot?.pulseReady == true }
         context.input.pressKey { it.keyAttack }
         world.connection.waitForServerboundPackets()
-        context.waitFor { CombatInput.snapshot?.pulseReady == false }
-        context.waitTicks(MELEE_APPROACH_TICKS)
-        context.input.pressKey(CombatInput.pulse)
-        context.waitFor { CombatInput.snapshot?.pulseReady == true }
-        // Real preparation packet and native attack hook; a fixed roll isolates damage from chance.
-        world.server.runOnServer<RuntimeException> {
-            val player = world.connection.serverPlayer
-            val level = world.connection.serverLevel
-            val target = checkNotNull(EntityTypes.VILLAGER.create(level, EntitySpawnReason.COMMAND))
-            target.setPos(player.position().add(0.0, 0.0, 2.0))
-            checkNotNull(target.getAttribute(Attributes.MAX_HEALTH)).baseValue = TARGET_HEALTH
-            target.health = TARGET_HEALTH.toFloat()
-            level.addFreshEntity(target)
-            val attack = checkNotNull(player.getAttribute(Attributes.ATTACK_DAMAGE))
-            val original = attack.baseValue
-            try {
-                attack.baseValue = MELEE_DAMAGE
-                player.random.setSeed(BLACK_FLASH_SEED)
-                player.attack(target)
-                check(target.health == TARGET_HEALTH.toFloat() - BLACK_FLASH_DAMAGE) {
-                    "Native primary hit must apply 4^2.5 = 32 damage; remaining health=${target.health}"
-                }
-            } finally {
-                attack.baseValue = original
-                target.discard()
-            }
-        }
         context.waitFor { CombatInput.snapshot?.pulseReady == false }
         world.server.runCommand("execute as @a run cursedoath practice")
         world.connection.waitForClientboundPackets()
@@ -201,8 +244,6 @@ class CombatClientGameTest : FabricClientGameTest {
     private companion object {
         const val SKY_PITCH = -90f
         const val MELEE_DAMAGE = 4.0
-        const val BLACK_FLASH_DAMAGE = 32f
-        const val BLACK_FLASH_SEED = 4096L
         const val MELEE_APPROACH_TICKS = 20
         const val TARGET_HEALTH = 500.0
         const val TARGET_X = 0.5

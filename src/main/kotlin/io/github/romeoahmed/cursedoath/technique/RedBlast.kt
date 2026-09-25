@@ -1,5 +1,6 @@
 package io.github.romeoahmed.cursedoath.technique
 
+import io.github.romeoahmed.cursedoath.domain.DomainInteractions
 import io.github.romeoahmed.cursedoath.world.hasLoadedChunks
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.LivingEntity
@@ -38,6 +39,7 @@ internal object RedBlast {
         direction: Vec3,
     ) {
         if (!TechniqueCombat.canAffect(player, target) || TechniqueCombat.hasInfinity(target)) return
+        if (DomainInteractions.contact(player, center, target.boundingBox.center) != null) return
         val distance = sqrt(target.boundingBox.distanceToSqr(center))
         val coverBounds = target.boundingBox.expandTowards(COVER_SAMPLE_MARGIN, 0.0, COVER_SAMPLE_MARGIN)
         if (distance >= RADIUS ||

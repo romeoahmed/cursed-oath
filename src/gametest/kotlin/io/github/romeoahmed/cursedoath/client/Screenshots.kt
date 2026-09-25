@@ -29,10 +29,16 @@ internal fun ClientGameTestContext.prepareScreenshots() {
     input.resizeWindow(WIDTH, HEIGHT)
 }
 
-internal fun ClientGameTestContext.capture(name: String): Path =
-    takeScreenshot(TestScreenshotOptions.of(name).withDeltaTicks(0f))
+internal fun ClientGameTestContext.capture(name: String): Path {
+    // Fixture commands must not obscure the HUD, wheel, or pose being inspected.
+    runOnClient<RuntimeException> {
+        it.gui.hud.chat
+            .clearMessages(false)
+    }
+    return takeScreenshot(TestScreenshotOptions.of(name).withDeltaTicks(0f))
+}
 
-/** Compare against this run's baseline, without maintaining cross-GPU golden images. */
+/** Compare within one run so fixed reference images do not impose a particular GPU output. */
 internal fun ClientGameTestContext.checkEffect(
     baseline: Path,
     name: String,

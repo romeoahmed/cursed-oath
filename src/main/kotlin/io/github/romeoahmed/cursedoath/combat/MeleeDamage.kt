@@ -2,7 +2,7 @@ package io.github.romeoahmed.cursedoath.combat
 
 import kotlin.math.pow
 
-/** Pre-mitigation damage units; positive strikes use at least two units for Black Flash. */
+/** Black Flash uses a minimum base of two damage units so unarmed strikes benefit from the exponent. */
 object MeleeDamage {
     private const val REINFORCEMENT = 1.15f
     private const val BLACK_FLASH_EXPONENT = 2.5

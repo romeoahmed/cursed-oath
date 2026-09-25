@@ -52,7 +52,10 @@ class LocalizationTest {
                     "$locale: $key placeholders",
                 )
             }
-            for (technique in Technique.entries) assertNotNull(values[technique.translationKey])
+            for (technique in Technique.entries) {
+                assertNotNull(values[technique.translationKey], "$locale: ${technique.path} full name")
+                assertNotNull(values["wheel.cursed-oath.${technique.path}"], "$locale: ${technique.path} wheel name")
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ package io.github.romeoahmed.cursedoath.client.input
 
 import com.mojang.blaze3d.platform.InputConstants
 import io.github.romeoahmed.cursedoath.CursedOath
+import io.github.romeoahmed.cursedoath.client.gui.TechniqueWheelScreen
 import io.github.romeoahmed.cursedoath.client.render.TechniqueVisuals
 import io.github.romeoahmed.cursedoath.network.CastRequest
 import io.github.romeoahmed.cursedoath.network.CombatSnapshot
@@ -19,6 +20,7 @@ object CombatInput {
     val select = key("select", InputConstants.KEY_R)
     val cast = key("cast", InputConstants.KEY_V)
     val cancel = key("cancel", InputConstants.KEY_X)
+    val wheel = key("wheel", InputConstants.KEY_B)
     val pulse = key("pulse", InputConstants.KEY_G)
     var selected = Technique.BLUE
         private set
@@ -41,6 +43,7 @@ object CombatInput {
             TechniqueVisuals.clear()
         }
         ClientTickEvents.END_CLIENT_TICK.register { client ->
+            while (wheel.consumeClick()) if (active(client)) client.gui.setScreen(TechniqueWheelScreen())
             while (select.consumeClick()) {
                 if (active(client)) selected = Technique.entries[(selected.ordinal + 1) % Technique.entries.size]
             }
@@ -48,6 +51,14 @@ object CombatInput {
             while (cancel.consumeClick()) if (active(client)) send(CastRequest.CANCEL)
             while (pulse.consumeClick()) if (active(client)) send(CastRequest.PULSE)
         }
+    }
+
+    fun choose(
+        technique: Technique,
+        cast: Boolean = false,
+    ) {
+        selected = technique
+        if (cast) send(technique.wireId)
     }
 
     private fun active(client: Minecraft) =

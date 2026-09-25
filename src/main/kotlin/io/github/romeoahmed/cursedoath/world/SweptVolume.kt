@@ -11,7 +11,7 @@ internal class SweptVolume(
     private val halfSize: Vec3,
     rounded: Boolean = false,
 ) {
-    val forward = end.subtract(start).normalize()
+    val forward = end.subtract(start).normalize().takeUnless { it == Vec3.ZERO } ?: Vec3(0.0, 0.0, 1.0)
     private val reference = if (abs(forward.y) < VERTICAL_THRESHOLD) Vec3(0.0, 1.0, 0.0) else Vec3(0.0, 0.0, 1.0)
     private val side = forward.cross(reference).normalize()
     private val up = side.cross(forward).normalize()

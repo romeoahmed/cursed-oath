@@ -15,14 +15,21 @@ enum class Technique(
     CLEAVE(4, "shrine.cleave", CastCost(10, 65), 5, 12, 0xFFB9A9),
     HEAL(5, "reverse_cursed_technique", CastCost(10, 140), 20, 30, 0x96F9C9),
     PURPLE(7, "limitless.purple", CastCost(80, 420), 50, 60, 0xB268FF),
+    UNLIMITED_VOID(8, "limitless.unlimited_void", CastCost(50, 550), 30, 0, 0x719BFF),
+    MALEVOLENT_SHRINE(9, "shrine.malevolent_shrine", CastCost(50, 550), 30, 0, 0xE65B4C),
+    SIMPLE_DOMAIN(10, "simple_domain", CastCost(0, 60), 0, 0, 0xD8F1F8),
+    AMPLIFICATION(11, "domain_amplification", CastCost(0, 0), 0, 0, 0xDDD9E8),
     INFINITY(6, "limitless.infinity", CastCost(0, 0), 0, 0, 0xB1ECFF),
     ;
+
+    val domain: Boolean get() = this == UNLIMITED_VOID || this == MALEVOLENT_SHRINE
+    val innate: Boolean get() = this != HEAL && this != SIMPLE_DOMAIN && this != AMPLIFICATION
 
     val destroysTerrain: Boolean get() =
         this == BLUE || this == RED || this == DISMANTLE || this == CLEAVE ||
             this == PURPLE
 
-    val requiresReversal: Boolean get() = this == RED || this == HEAL || this == PURPLE
+    val requiresReversal: Boolean get() = this == RED || this == PURPLE
 
     val translationKey: String get() = "ability.cursed-oath.$path"
 

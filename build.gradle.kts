@@ -6,7 +6,7 @@ plugins {
     id("org.jetbrains.kotlin.jvm") version "2.4.20"
     id("com.diffplug.spotless") version "8.10.2"
     id("dev.detekt") version "2.0.0-alpha.6"
-    id("org.jetbrains.kotlinx.kover") version "0.9.8"
+    id("org.jetbrains.kotlinx.kover") version "0.9.9"
 }
 
 repositories {
@@ -92,9 +92,11 @@ spotless {
             "src/**/*.json",
             "*.md",
             "docs/*.md",
+            "art/**/*.md",
+            "art/**/*.py",
+            "src/**/*.fsh",
             ".editorconfig",
             "gradle.properties",
-            "config/**/*.yml",
             ".github/**/*.yml",
         )
         trimTrailingWhitespace()
@@ -146,7 +148,7 @@ tasks.jar {
 val checkClientGraphics =
     tasks.register<JavaExec>("checkClientGraphics") {
         classpath = sourceSets["gametest"].runtimeClasspath
-        mainClass = "io.github.romeoahmed.cursedoath.client.GraphicsProbeKt"
+        mainClass = "io.github.romeoahmed.cursedoath.client.VulkanProbeKt"
         timeout = Duration.ofSeconds(30)
         jvmArgs("--enable-native-access=ALL-UNNAMED")
         if (System.getProperty("os.name").startsWith("Mac")) jvmArgs("-XstartOnFirstThread")

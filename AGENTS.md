@@ -1,40 +1,40 @@
 # Repository Guidelines
 
-## Scope and layout
+## Project map
 
-Cursed Oath (咒誓) is a Minecraft 26.3 Fabric combat prototype. [README](README.md) explains how to run it; [design](docs/design.zh-CN.md) includes planned features.
+Cursed Oath (咒誓) is a Minecraft 26.3 Fabric combat mod. Read [README](README.md) for setup and controls, [design](docs/design.zh-CN.md) for scope, and [architecture](docs/architecture.zh-CN.md) for ownership and lifecycle constraints.
 
 The package root is `io.github.romeoahmed.cursedoath`:
 
-- `src/main/kotlin/`: `combat`, `technique`, `world`, `network`, and `command`.
-- `src/main/java/`: narrow vanilla mixins.
-- `src/client/kotlin/`: input, HUD, animation, and rendering. Keep client imports out of common code.
-- `src/main/resources/`: Fabric metadata, mixin configuration, translations, and PAL animations.
-- `src/test/kotlin/`: unit tests; `src/gametest/`: server and client GameTests.
+- `src/main/kotlin/`: server combat, techniques, domains, terrain, networking, and commands.
+- `src/client/kotlin/`: input, GUI, animation, rendering, and sound; feature visuals live in `render/domain/` and `render/limitless/`.
+- `src/main/java/` and `src/client/java/`: narrow vanilla mixins.
+- `src/main/resources/`: metadata, translations, assets, and data.
+- `src/test/` and `src/gametest/`: unit tests and a separate test mod. GameTests follow production packages; shared fixtures stay at the package root.
+- `art/`: editable assets and tools; follow the [asset instructions](art/README.md).
 
-## Commands and verification
+## Build and verify
 
-Use JDK 25 and the wrapper; substitute `gradlew.bat` on Windows.
+Use JDK 25 and the wrapper from the repository root (`gradlew.bat` on Windows).
 
-- `./gradlew genSources`: generate Minecraft sources; inspect actual targets before changing mixins or version-sensitive API calls.
-- `./gradlew spotlessApply`: apply ktlint, default Palantir Java Format, and text whitespace rules.
-- `./gradlew build`: compile, run unit/server tests, check formatting, Detekt, and scoped coverage, then package JARs.
-- `./gradlew runClientGameTest`: run Vulkan client checks after `build`; requires a graphics session. Automatically runs the graphics preflight and rejects backend fallback. Inspect `build/run/clientGameTest/screenshots/` for visual changes. Later server-test cleanup can delete these outputs.
-- `./gradlew runClient` / `runServer`: launch development environments.
-- `./gradlew checkClientGraphics`: independently check Minecraft's Vulkan device and presentation surface with a 30-second timeout.
+- `./gradlew genSources`: inspect targets before changing mixins or version-sensitive calls.
+- `./gradlew spotlessApply`: apply ktlint, default Palantir Java Format, and text formatting. Run before other checks.
+- `./gradlew build`: compile, run unit/server tests, check formatting, Detekt, and coverage, then package JARs.
+- `./gradlew runClientGameTest`: run the complete Vulkan client suite after `build`; requires a graphics session. Its 30-second preflight rejects unavailable graphics, and tests reject backend fallback.
+- `./gradlew test --tests '*ClassName'` or `./gradlew runGameTest`: focused verification.
 
-For focused work, use `./gradlew test --tests '*ClassName'` or `./gradlew runGameTest`. Documentation-only changes need formatting and link checks. Report checks actually performed; screenshot assertions establish presence and expiry, not visual quality.
+Inspect captures in `build/run/clientGameTest/screenshots/`; preserve them before server tests, whose cleanup can delete them. Pixel assertions establish appearance and expiry, not visual quality. Text-only changes need formatting and link checks. Report only checks actually performed.
 
-## Implementation constraints
+## Implementation and tests
 
-Follow `.editorconfig` and formatter output. Use PascalCase types/files, camelCase members, and UPPER_SNAKE_CASE constants. Prefer native Minecraft/Fabric APIs; justify additional dependencies. Explain non-obvious constraints in comments rather than restating code.
+Follow `.editorconfig` and formatter output. Match filenames to types; use camelCase members and UPPER_SNAKE_CASE constants. Keep client imports out of common code. Prefer Minecraft/Fabric APIs; justify dependencies.
 
-Keep combat and terrain state server-owned, render snapshots immutable, and world access on its owning thread. Preserve mod/resource IDs, save keys, and explicit wire IDs across refactors. Construct identifiers with `CursedOath.id(...)`.
+Keep combat and terrain server-owned, world access on its owning thread, and render snapshots immutable. Preserve resource IDs, save keys, and wire IDs. Create identifiers with `CursedOath.id(...)`.
 
-Test behavioral boundaries and regressions with `kotlin-test-junit5`/JUnit 6 or GameTest. Kover requires 90% line coverage only for `CursedEnergy` and `RequestGate`. Keep warnings and Detekt findings actionable; avoid baselines and broad suppressions.
+Test behavior with `kotlin-test-junit5`/JUnit 6 or GameTest. Use scoped fixtures and `onFinish` cleanup; never clear shared runtime state from a test. Use spectators for isolated visual captures and ordinary players for input tests. Kover requires 90% line coverage for `CursedEnergy` and `RequestGate`. Fix findings without baselines or broad suppressions.
 
 ## Text and contributions
 
-Update `en_us`, `zh_cn`, and `ja_jp` together, including placeholders; follow [terminology](docs/localization.zh-CN.md). Separate implemented behavior, planned rules, and verified canon in documentation.
+Align `en_us`, `zh_cn`, and `ja_jp` keys and placeholders; follow [terminology](docs/localization.zh-CN.md). Separate implemented behavior, plans, and canon evidence. Comments explain constraints or reasoning.
 
-Use imperative commit subjects. PRs describe behavior, relevant issues, validation, and screenshots for visible changes. Keep generated builds, caches, and run directories out of commits.
+Use imperative commit subjects. PRs describe behavior, relevant issues, validation, and screenshots for visible changes. Exclude builds, caches, and run directories.

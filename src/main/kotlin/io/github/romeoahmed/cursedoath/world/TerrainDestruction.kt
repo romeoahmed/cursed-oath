@@ -101,6 +101,16 @@ internal object TerrainDestruction {
                     .iterator()
         }
 
+        /** Continuous Shrine cuts share the global budget; pulverized fragments have no item drops. */
+        fun domainCuts(
+            center: Vec3,
+            radius: Double,
+        ) {
+            sphere(center, radius)
+            released = true
+            persistent = true
+        }
+
         fun close() {
             finished = true
             positions = null
@@ -109,17 +119,13 @@ internal object TerrainDestruction {
             source = null
         }
 
-        private fun stop(): Boolean {
-            close()
-            return false
-        }
-
         private val validOwner: Boolean get() =
             released || (owner.level() === level && owner.isAlive && !owner.isRemoved && !owner.isSpectator)
 
         internal fun advance(): Boolean {
             if (!validOwner || (!released && level.gameTime >= expires)) {
-                return stop()
+                close()
+                return false
             }
             val cursor = positions ?: pending.removeFirstOrNull()?.also { positions = it } ?: return false
             return if (!cursor.hasNext()) {
@@ -140,7 +146,8 @@ internal object TerrainDestruction {
                     SectionPos.blockToSectionCoord(pos.z),
                 ) == null
             ) {
-                return if (released) false else stop()
+                if (!released) close()
+                return false
             }
             if (!level.worldBorder.isWithinBounds(pos) || level.isOutsideBuildHeight(pos)) return false
             val state = level.getBlockState(pos)
@@ -155,7 +162,10 @@ internal object TerrainDestruction {
             origin: Vec3,
             pos: BlockPos,
         ): Boolean {
-            if (!level.hasLoadedChunks(AABB(origin, Vec3.atCenterOf(pos)))) return stop()
+            if (!level.hasLoadedChunks(AABB(origin, Vec3.atCenterOf(pos)))) {
+                close()
+                return false
+            }
             val hit =
                 level.clipIncludingBorder(
                     ClipContext(origin, Vec3.atCenterOf(pos), ClipContext.Block.COLLIDER, ClipContext.Fluid.ANY, owner),
@@ -166,13 +176,10 @@ internal object TerrainDestruction {
         private fun protected(
             state: BlockState,
             pos: BlockPos,
-        ): Boolean {
-            val material = state.hasBlockEntity() || state.getDestroySpeed(level, pos) < 0 || !state.fluidState.isEmpty
-            val restricted =
+        ): Boolean =
+            state.hasBlockEntity() || state.getDestroySpeed(level, pos) < 0 || !state.fluidState.isEmpty ||
                 !level.mayInteract(owner, pos) ||
-                    owner.blockActionRestricted(level, pos, owner.gameMode.gameModeForPlayer)
-            return material || restricted
-        }
+                owner.blockActionRestricted(level, pos, owner.gameMode.gameModeForPlayer)
 
         private fun breakBlock(
             pos: BlockPos,

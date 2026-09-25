@@ -1,5 +1,6 @@
 package io.github.romeoahmed.cursedoath.technique
 
+import io.github.romeoahmed.cursedoath.domain.DomainInteractions
 import io.github.romeoahmed.cursedoath.world.SweptVolume
 import io.github.romeoahmed.cursedoath.world.TerrainDestruction
 import io.github.romeoahmed.cursedoath.world.hasLoadedChunks
@@ -32,6 +33,13 @@ internal class PurpleFlight(
             projectile.discard()
             return
         }
+        DomainInteractions.pierce(
+            caster,
+            volume,
+            TechniqueTuning.PURPLE_RADIUS,
+            TechniqueTuning.PURPLE_DAMAGE,
+            hit,
+        )
         for (target in level.getEntitiesOfClass(LivingEntity::class.java, volume.bounds.inflate(MOVEMENT_MARGIN))) {
             if (target.uuid in hit || !TechniqueCombat.canAffect(caster, target) ||
                 TechniqueCombat.hasInfinity(target)
@@ -42,6 +50,7 @@ internal class PurpleFlight(
             if (volume.entry(target.boundingBox, movement) != null) {
                 hit.add(target.uuid)
                 target.hurtServer(level, level.damageSources().playerAttack(caster), TechniqueTuning.PURPLE_DAMAGE)
+                if (projectile.isRemoved) return
             }
         }
         if (!terrain.finished) {

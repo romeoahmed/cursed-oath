@@ -22,6 +22,37 @@ class SphereSweepTest {
     }
 
     @Test
+    fun `query order does not change contact results`() {
+        val start = Vec3(-5.0, -5.0, -5.0)
+        val end = Vec3(5.0, 5.0, 5.0)
+        val sweep = SphereSweep(start, end, 1.0)
+        val boxes =
+            listOf(
+                AABB(-1.0, -0.5, -1.5, 1.0, 0.5, 1.5),
+                AABB(-20.0, -20.0, 3.0, 20.0, 20.0, 4.0),
+                AABB(-1.0, -1.0, -1.0, 1.0, 1.0, 1.0),
+                AABB(-20.0, -20.0, 6.0, 20.0, 20.0, 7.0),
+            )
+        repeat(3) {
+            for (box in boxes) assertEquals(SphereSweep(start, end, 1.0).entry(box), sweep.entry(box))
+        }
+        assertEquals(1.0, sweep.entry(boxes.last()))
+    }
+
+    @Test
+    fun `oblique sweeps include exact endpoint contact on different faces`() {
+        val sweep = SphereSweep(Vec3.ZERO, Vec3(2.0, 3.0, 5.0), 6.0)
+        for (box in listOf(
+            AABB(1.0, 2.0, 11.0, 2.0, 3.0, 12.0),
+            AABB(8.0, 2.0, 4.0, 9.0, 3.0, 5.0),
+            AABB(8.0, 3.0, 4.0, 9.0, 4.0, 5.0),
+        )) {
+            assertEquals(1.0, sweep.entry(box))
+        }
+        assertNull(sweep.entry(AABB(8.001, 3.0, 4.0, 9.001, 4.0, 5.0)))
+    }
+
+    @Test
     fun `stationary spheres tangency and negative direction have bounded contact times`() {
         val box = AABB(-1.0, -1.0, -1.0, 1.0, 1.0, 1.0)
         assertEquals(0.0, SphereSweep(Vec3.ZERO, Vec3.ZERO, 1.0).entry(box))

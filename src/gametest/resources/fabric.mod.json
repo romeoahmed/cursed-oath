@@ -6,20 +6,28 @@
 	"environment": "*",
 	"entrypoints": {
 		"fabric-gametest": [
-			"io.github.romeoahmed.cursedoath.CombatGameTest",
-			"io.github.romeoahmed.cursedoath.MeleePreparationGameTest",
-			"io.github.romeoahmed.cursedoath.RedBlastGameTest",
-			"io.github.romeoahmed.cursedoath.TechniqueWaveGameTest",
-			"io.github.romeoahmed.cursedoath.PurpleLoadGameTest",
-			"io.github.romeoahmed.cursedoath.TerrainDestructionGameTest",
-			"io.github.romeoahmed.cursedoath.TechniqueImpactGameTest",
-			"io.github.romeoahmed.cursedoath.TechniqueOrbGameTest"
+			"io.github.romeoahmed.cursedoath.combat.CombatGameTest",
+			"io.github.romeoahmed.cursedoath.combat.MeleePreparationGameTest",
+			"io.github.romeoahmed.cursedoath.technique.RedBlastGameTest",
+			"io.github.romeoahmed.cursedoath.technique.TechniqueWaveGameTest",
+			"io.github.romeoahmed.cursedoath.technique.PurpleLoadGameTest",
+			"io.github.romeoahmed.cursedoath.world.TerrainDestructionGameTest",
+			"io.github.romeoahmed.cursedoath.technique.TechniqueImpactGameTest",
+			"io.github.romeoahmed.cursedoath.technique.TechniqueOrbGameTest",
+			"io.github.romeoahmed.cursedoath.domain.DomainGameTest",
+			"io.github.romeoahmed.cursedoath.technique.InfinityGameTest",
+			"io.github.romeoahmed.cursedoath.domain.DomainBarrierGameTest",
+			"io.github.romeoahmed.cursedoath.domain.DomainDamageGameTest"
 		],
 		"fabric-client-gametest": [
 			"io.github.romeoahmed.cursedoath.client.CombatClientGameTest",
 			"io.github.romeoahmed.cursedoath.client.RenderClientGameTest",
 			"io.github.romeoahmed.cursedoath.client.PurpleClientGameTest",
-			"io.github.romeoahmed.cursedoath.client.ProjectileClientGameTest"
+			"io.github.romeoahmed.cursedoath.client.ProjectileClientGameTest",
+			"io.github.romeoahmed.cursedoath.client.DomainClientGameTest"
 		]
-	}
+	},
+	"mixins": [
+		"cursed-oath-test.mixins.json"
+	]
 }
