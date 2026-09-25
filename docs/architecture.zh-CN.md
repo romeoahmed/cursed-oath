@@ -4,18 +4,20 @@
 
 ## 技术基线
 
-| 技术                     | 仓库版本                                                             | 用途                             |
-| ------------------------ | -------------------------------------------------------------------- | -------------------------------- |
-| Minecraft / Fabric       | 26.3 / Loader 0.19.5 / API 0.161.0+26.3                              | 原生生命周期与未混淆名称         |
-| Java / Kotlin            | JDK 25 / Kotlin 2.4.20 / FLK 1.14.1+kotlin.2.4.20                    | Kotlin 行为实现、Java Mixin      |
-| Gradle / Loom            | Wrapper 9.7.1 / Loom 1.18.2                                          | 单工程、环境源集分离、配置缓存   |
-| Player Animation Library | 1.2.7+mc.26.3                                                        | 原版玩家动作层                   |
-| 格式与分析               | Spotless 8.10.2、ktlint 1.8.0、Palantir 2.98.0、Detekt 2.0.0-alpha.6 | 默认格式化、类型分析、警告即失败 |
-| 测试                     | kotlin-test-junit5、JUnit BOM 6.1.3、Kover 0.9.9、Fabric GameTest    | 规则、世界交互与客户端验证       |
+项目使用 Java 25、Minecraft 26.3、Fabric 和 PAL，保持单工程与 Gradle Kotlin DSL。版本直接查阅构建声明，避免在文档维护第二份清单：
 
-版本以 [gradle.properties](../gradle.properties)、[build.gradle.kts](../build.gradle.kts)、[Wrapper](../gradle/wrapper/gradle-wrapper.properties) 为准；安装约束见 [fabric.mod.json](../src/main/resources/fabric.mod.json)。依赖不打包进成品 JAR。`kotlin.jvmToolchain(25)` 统一编译目标，不启用预览语法。
+| 配置                                                     | 内容                                                |
+| -------------------------------------------------------- | --------------------------------------------------- |
+| [gradle.properties](../gradle.properties)                | Minecraft、Loader、Fabric API、Loom 和项目版本      |
+| [build.gradle.kts](../build.gradle.kts)                  | Java toolchain、PAL、格式化、静态分析、测试与覆盖率 |
+| [Wrapper](../gradle/wrapper/gradle-wrapper.properties)   | Gradle 发行版及校验值                               |
+| [fabric.mod.json](../src/main/resources/fabric.mod.json) | 安装侧别、运行依赖与入口                            |
 
-升级时核对 [Kotlin/Gradle 兼容表](https://kotlinlang.org/docs/gradle-configure-project.html)、实际解析依赖和构建结果。修改版本敏感调用前运行 `genSources`，直接检查目标 Minecraft 源码与 Fabric 构件；其他版本的指南不能替代签名核验。
+依赖不打包进成品 JAR。Java toolchain 与 `--release 25` 统一编译目标，不启用预览特性。Gradle Kotlin DSL 使用 Gradle 自带编译器，脚本警告即失败。
+
+升级时核对 [Gradle Java 兼容表](https://docs.gradle.org/current/userguide/compatibility.html)、实际解析依赖和构建结果。修改版本敏感调用前运行 `genSources`，直接检查目标 Minecraft 源码与 Fabric 构件；其他版本的指南不能替代签名核验。
+
+[26.3 的 SDL 输入迁移](https://fabricmc.net/2026/09/15/263.html)通过原生 `InputConstants` 适配，避免硬编码平台键值。渲染保持提取、提交分离，通过 RenderPearl 和原生 OIT 管线兼容 Vulkan。
 
 ## 目录与依赖
 
@@ -24,7 +26,7 @@
 | 包                           | 职责                                                             |
 | ---------------------------- | ---------------------------------------------------------------- |
 | `combat`                     | 玩家运行状态、咒力账本、近战、施法资格与持久附件                 |
-| `technique`                  | 术式释放、飞行实体、吸引场和中性防御                             |
+| `technique`                  | 术式释放、飞行实体、捌的切割网格、吸引场和中性防御               |
 | `domain`                     | 领域索引、生命周期、边界、必中与保护                             |
 | `world`                      | 扫掠几何、就绪区块查询、分批地形破坏                             |
 | `network` / `command`        | 请求、快照、事件协议与练习命令                                   |
@@ -32,7 +34,13 @@
 | `client/animation` / `sound` | PAL 动作与本地领域音效                                           |
 | `client/render`              | 共用几何、管线和事件表现；`domain`、`limitless` 子包存放专属视觉 |
 
-Fabric Data Attachments 管理附件状态，PAL 管理玩家动画。按职责建包，保持单模块；新增依赖须说明用途、兼容版本与安装侧别。类型文件与类型同名，测试使用 `Test`、`GameTest`、`ClientGameTest` 后缀。重命名保留注册键、存档键和协议编号。[Kotlin 约定](https://kotlinlang.org/docs/coding-conventions.html#source-code-organization)、[Fabric 项目结构](https://docs.fabricmc.net/develop/getting-started/project-structure)
+Fabric Data Attachments 管理附件状态，PAL 管理玩家动画。按职责建包，保持单模块；新增依赖须说明用途、兼容版本与安装侧别。类型文件与类型同名，测试使用 `Test`、`GameTest`、`ClientGameTest` 后缀。重命名保留注册键、存档键和协议编号。[Fabric 项目结构](https://docs.fabricmc.net/develop/getting-started/project-structure)
+
+## Java 与注释
+
+不可变值使用 record；生命周期对象使用普通类；封闭类型层次使用 sealed。热路径优先直接循环与有界复用。空值契约由 JSpecify 与 NullAway 检查，原生 API 的可空返回值在边界处理；具体贡献约定见 [AGENTS.md](../AGENTS.md)。
+
+声明契约采用 Java 25 支持的 `///` Markdown Javadoc，首句概括职责，必要时链接相关类型或成员。已有方法文档说明参数、返回值及异常；覆盖方法沿用有效的继承文档，不为简单访问器补模板。局部实现原因使用 `//`，不把实现细节写成调用方保证。修改后用 JDK doclet 检查语法与引用。[Javadoc 规范](https://docs.oracle.com/en/java/javase/25/docs/specs/javadoc/doc-comment-spec.html)
 
 ## 状态与联网
 
@@ -40,7 +48,7 @@ Fabric Data Attachments 管理附件状态，PAL 管理玩家动画。按职责�
 
 - `Fighter` 绑定一个玩家实体及其世界。死亡、断线、换维度或取消会结束准备，保留已付费用与恢复负担。
 - `SorcererProfile`、`SorcererResources` 是 Codec 校验的不可变持久附件，保存资格、余额、恢复和熔断。活动施法及费用预留不续存。
-- 资源快照每四 tick 检查，仅变化时发给本人；加入、重生和换维度强制同步。个人资源附件不重复自动同步；信息过载和反领域表现使用临时、全观察者同步附件。
+- 资源快照每四 tick 及请求处理后检查，仅变化时发给本人；加入、重生和换维度重新同步。个人资源附件不重复自动同步；信息过载和反领域表现使用临时、全观察者同步附件。
 - 请求携带连接会话 UUID、单调序号和显式 wire ID，`RequestGate` 拒绝重放并限频。确认事件包含 UUID、维度、服务端 tick、阶段和位置，按发生位置广播；客户端有界去重。
 - 飞行位置、插值和移除沿用原生实体跟踪。协议使用 `StreamCodec.composite`，稳定字段顺序与字节编码由兼容性测试约束。
 
@@ -48,7 +56,7 @@ Fabric Data Attachments 管理附件状态，PAL 管理玩家动画。按职责�
 
 ## 命中与地形
 
-`TechniqueProjectile` 是密封基类：`TechniqueOrb` 承载苍/赫，`TechniqueWave` 承载茈/解，`PurpleFlight` 独立推进茈。实体共享 `SynchedEntityData` 和 `SteppedInterpolationHandler`；渲染裁剪范围独立于碰撞箱。苍、赫、解绑定释放时的玩家实体；茈保留原始归属并独立存续。不能用原生所有者查询判断旧施术者是否存活，因为 UUID 查询可能找到重生后的实体。
+`TechniqueProjectile` 是密封基类：`TechniqueOrb` 承载苍/赫，`TechniqueWave` 承载茈/解，`PurpleFlight` 独立推进茈。实体共享 `SynchedEntityData` 和 `SteppedInterpolationHandler`；渲染裁剪范围独立于碰撞箱。苍、赫、解绑定释放时的玩家实体；茈保留原始归属并独立存续。不能用原生所有者查询判断旧施术者是否存活，因为 UUID 查询可能找到重生后的实体。原生所有者引用也可能保留已换维度的玩家；独立飞行和结界碰撞始终使用飞行实体所在世界。
 
 | 攻击    | 接触与遮挡                                                                                                                                                                              |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -57,21 +65,21 @@ Fabric Data Attachments 管理附件状态，PAL 管理玩家动画。按职责�
 | 解      | 局部坐标中的保守旋转盒体扫掠；前方短段挖掘后推进，等待时仍检查主体接触                                                                                                                  |
 | 捌      | `CleaveLattice` 共用实体、地形和显示网格；初始接触立即判伤，其余目标在开路后复核位置与遮挡                                                                                              |
 
-茈/解纳入目标一 tick 的相对运动，宽相位额外覆盖四格移动；任意高速位移或传送不在保证范围内。扫掠缓冲只在所属服务器线程顺序复用。伤害回调可能移除攻击实体、关闭地形任务或改变后续目标；每次回调后复核有效性。
+茈/解纳入目标一 tick 的相对运动，宽相位额外覆盖四格移动；任意高速位移或传送不在保证范围内。扫掠缓冲只在所属服务器线程顺序复用。伤害回调可能移除攻击实体、关闭地形任务或改变后续目标；回调之后、继续处理目标或提交地形前复核相关实体与工作是否有效。
 
-`TerrainDestruction` 在普通破坏术式准备时预留工作槽，以服务器为单位轮转处理。领域按需申请地形任务，必中不依赖申请结果。
+`TerrainDestruction` 在普通破坏术式准备时预留工作槽，以服务器为单位轮转处理。执行中的任务仍占用工作槽，原生回调中再次申请也不能突破容量。领域按需申请地形任务，必中不依赖申请结果。
 
-| 服务器总限制                       | 当前值    |
-| ---------------------------------- | --------- |
-| 工作槽（含准备中的施法）           | 16        |
-| 每 tick 几何与提交访问             | 16,384    |
-| 每 tick 直接移除方块               | 1,024     |
-| 协作式时间预算                     | 4 ms/tick |
-| 未释放任务、球形挖掘与普通切割寿命 | 600 tick  |
+| 服务器总限制               | 当前值    |
+| -------------------------- | --------- |
+| 工作槽（含准备中的施法）   | 16        |
+| 每 tick 几何与提交访问     | 16,384    |
+| 每 tick 直接移除方块       | 1,024     |
+| 协作式时间预算             | 4 ms/tick |
+| 普通任务寿命（从预留开始） | 600 tick  |
 
-球形挖掘按曼哈顿顺序向外枚举；普通切割增量筛选后按前进深度排序。茈逐段直接枚举并排除上段覆盖位置，每发最多 32 段，队列上限 64 段。每次几何访问及提交都计入预算，提交时重新读取方块状态。
+球形挖掘按曼哈顿顺序向外枚举；普通切割增量筛选后按前进深度排序。茈逐段直接枚举并排除上段覆盖位置，每发最多 32 段，队列上限 64 段。扫描、提交及空闲轮询均消耗访问预算；提交时重新读取方块状态。
 
-破坏通过 `Level.destroyBlock` 与 Fabric BEFORE/CANCELED/AFTER 事件完成；回调关闭任务或更换方块后放弃本次提交。容器、流体、不可破坏块及权限否决保留。解/捌从原始攻击后缘发出平行遮挡射线，茈/球形挖掘跳过保护块。普通破坏遵循 `minecraft:block_drops`；茈与御厨子不掉落物品。
+破坏通过 `Level.destroyBlock` 与 Fabric BEFORE/CANCELED/AFTER 事件完成；回调关闭任务或更换方块后放弃本次提交。所有带方块实体的方块、含流体方块、不可破坏块及权限否决保留。解/捌从原始攻击后缘发出平行遮挡射线，茈/球形挖掘跳过保护块。普通破坏遵循 `minecraft:block_drops`；茈与御厨子不掉落物品。
 
 `ServerChunkCache.getChunkNow` 检查实际就绪区块，不以票据资格代替就绪状态。飞行术式在非实体模拟区块前结束。苍/赫及普通切割在所有者失效、区块不可用或超时时终止；茈封闭提交后继续处理有限队列，跳过已卸载区块，不强制加载。已提交伤害和破坏不回滚。
 
@@ -99,7 +107,7 @@ Fabric Data Attachments 管理附件状态，PAL 管理玩家动画。按职责�
 
 ## 验证
 
-命令见 [AGENTS.md](../AGENTS.md)，CI 见 [build.yml](../.github/workflows/build.yml)。Spotless、四个源集的 Detekt 类型分析和 scoped Kover 接入构建；编译警告视为错误。[Kotlin 代码检查](https://kotlinlang.org/docs/jvm-code-analysis.html)、[Detekt](https://detekt.dev/docs/gettingstarted/gradle/)
+命令见 [AGENTS.md](../AGENTS.md)，CI 见 [build.yml](../.github/workflows/build.yml)。Spotless、Error Prone、NullAway 与 JaCoCo 接入构建；`javac` 开启 lint 并将警告视为错误。关闭 `classfile` 类别的告警以兼容 JOML 的旧字节码，源码 lint 保留。Mixin 注入回调用 `@Keep` 表明框架入口；实例身份比较只在确有需要的方法上说明并豁免对应检查。[Error Prone 插件](https://github.com/tbroyer/gradle-errorprone-plugin)、[NullAway JSpecify 模式](https://github.com/uber/NullAway/wiki/JSpecify-Support)、[JSpecify](https://jspecify.dev/docs/user-guide/)
 
 | 层次                       | 检查内容                                             |
 | -------------------------- | ---------------------------------------------------- |
@@ -109,12 +117,12 @@ Fabric Data Attachments 管理附件状态，PAL 管理玩家动画。按职责�
 | Python unittest / 导出检查 | 模型变换、面方向、材质、错误输入及编辑源与导出一致性 |
 | 实机与性能验收             | 画面质量、设备兼容、多人行为与持续负载               |
 
-断言以外部行为为主；账本、稳定协议字节和几何边界保留直接测试，不固定私有布局或遍历顺序。Kover 的 90% 行覆盖只约束 `CursedEnergy` 与 `RequestGate`。`kotlin-test-junit5` 提供测试依赖，JUnit BOM 统一版本，GameTest 编译关联 main。
+断言以外部行为为主；账本、稳定协议字节和几何边界保留直接测试，不固定私有布局或遍历顺序。JaCoCo 的 90% 行覆盖只约束 `CursedEnergy` 与 `RequestGate`。单元测试直接使用 JUnit Jupiter，JUnit BOM 统一版本。GameTest 是 Loom 管理的独立测试源集；测试代码与依赖不进入发布 JAR。
 
 服务端夹具由 `CombatFixtures`、`TestLifecycle` 按测试持有；原生完成监听器在成功、失败及超时时清理。测试 accessor 仅用于访问 `GameTestHelper.testInfo`，不进入发布 JAR。Fabric 事件只注册一次，临时回调随测试结束移除；共享容量通过测试环境分组隔离，测试不得调用全局清理。
 
 异步行为使用测试序列等待；只有隔离攻击/碰撞钩子的夹具手动推进实体。位移测试保留物理模拟。客户端使用同次运行基线、固定机位与分辨率，旁观者用于独立效果，普通玩家用于输入和施法。像素断言不评价美术质量。[Fabric 自动测试](https://docs.fabricmc.net/develop/automatic-testing)
 
-先 `build`，再完整运行 `runClientGameTest`，防止服务端清理删除截图。客户端任务先做 30 秒原生 Vulkan 设备/显示表面预检，再断言游戏实际后端。Linux CI 使用 Xvfb/X11 与 Mesa Lavapipe；设备直接创建只存在于测试预检。[SDL 驱动](https://wiki.libsdl.org/SDL3/SDL_HINT_VIDEO_DRIVER)、[Vulkan 驱动选择](https://vulkan.lunarg.com/doc/view/latest/linux/LoaderDriverInterface.html)
+先 `build`，再完整运行 `runClientGameTest`，防止服务端清理删除截图。客户端任务先检查原生 Vulkan 设备与显示表面，预检超时上限为 30 秒；测试再断言游戏实际后端。Linux CI 使用 Xvfb/X11 与 Mesa Lavapipe；设备直接创建只存在于测试预检。[SDL 驱动](https://wiki.libsdl.org/SDL3/SDL_HINT_VIDEO_DRIVER)、[Vulkan 驱动选择](https://vulkan.lunarg.com/doc/view/latest/linux/LoaderDriverInterface.html)
 
-CI 使用仓库只读权限，同一分支的新运行取消旧运行；无论成败均收集现有报告、日志和截图，成功后上传 JAR。共享 CI 耗时不作为性能基准。模型工具只依赖 Python 标准库，制作检查见[模型说明](../art/shrine/README.md)。
+CI 使用仓库只读权限，同一分支的新运行取消旧运行；未取消的运行无论成败均收集现有报告、日志和截图，成功后上传 JAR。共享 CI 耗时不作为性能基准。模型工具只依赖 Python 标准库，制作检查见[模型说明](../art/shrine/README.md)。

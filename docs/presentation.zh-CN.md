@@ -4,7 +4,7 @@
 
 ## 苍、赫与茈
 
-美术以[已选概念图](../art/references/limitless.png)为方向：凝实、连续的球形主体承载体积，分块色阶表现能量表面，少量贴面流带和尾迹表达运动。图像是 AI 生成参考；角色细节、环境照明不代表实机功能，也不作为原作证据。
+美术以[概念图](../art/references/limitless.png)为方向：凝实、连续的球形主体承载体积，分块色阶表现能量表面，少量贴面流带和尾迹表达运动。图像是 AI 生成参考；角色细节、环境照明不代表实机功能，也不作为原作证据。
 
 | 能力 | 当前表现                                                                                        |
 | ---- | ----------------------------------------------------------------------------------------------- |
@@ -30,7 +30,7 @@
 
 神龛在展开位置后方升起。四面巨口的上下颚突出，上腭内凹，前后破风各有一张小口；宽阔挑檐通过檐底、梁架和柱头承托连接。瓦垄、脊端兽骨与基底牛骨保持清晰层次。尺寸、材质和导出约束集中在[模型说明](../art/shrine/README.md)。
 
-斩线固定于领域局部网格，错峰扫开、收尖和衰减，少量长线形成重音。整条线距镜头三格内隐藏，三至七格淡入，二十四至三十二格淡出；摄影机跨格时斩线不整体跳位。范围提示独立于装饰斩线。
+斩线固定于领域局部网格，错峰扫开、收尖和衰减，少量长线形成重音。线段最近点距镜头三格内时隐藏，三至七格淡入；按线段中心距离在二十四至三十二格间淡出；摄影机跨格时斩线不整体跳位。范围提示独立于装饰斩线。
 
 简易领域用完整淡色边界保留真实保护半径，亮段随强度衰减；展延显示贴身气层。领域起止、保护破裂和斩击复用原版声音，提供三语字幕；领域内斩击音每五 tick 最多触发一次。
 
@@ -40,7 +40,7 @@ HUD 显示当前术式、可用咒力和预留量；准备、恢复、近战预�
 
 八个生得术式位置固定，自疗、简易领域和展延置于下方。槽位使用短名称，预览区显示全称、可用咒力与消耗；维持型能力显示持续消耗，已开启防御显示解除。咒力不足、展延和熔断提示来自同步状态，服务端最终复核施放资格。
 
-方向选择保留中心安全区；原生按钮提供 Tab、回车和朗读支持。左键选择，右键或施放键使用，Esc 或轮盘键关闭。当前选择与预览通过暗色槽位、术式色侧线和方向标记区分。世界持续运行。操作入口见 [README](../README.md#controls)，文本规范见[三语指南](localization.zh-CN.md)。
+方向选择保留中心安全区；原生按钮提供 Tab、回车和朗读支持。左键选择，右键或施放键使用，Esc 或轮盘键关闭。白色小方点标记已选术式，彩色边框与方向标记显示当前预览。世界持续运行。操作入口见 [README](../README.md#controls)，文本规范见[三语指南](localization.zh-CN.md)。
 
 ## 制作约束
 
@@ -54,7 +54,7 @@ HUD 显示当前术式、可用咒力和预留量；准备、恢复、近战预�
 
 PAL 第一人称动作需检查普通/纤细皮肤、持物、双持、护甲、FOV、潜行和游泳。增加局部折射、GPU 粒子或镜头反馈前，先证明可读性收益及性能余量。
 
-制作参考：[Blockbench](https://www.blockbench.net/wiki/guides/blockbench-overview-tips/)、[PAL 播放控制](https://docs.zigythebird.com/pal/gettingstarted/how_to_play_animations/)、[PAL 第一人称](https://docs.zigythebird.com/pal/features/first_person/)、[固定时间步](https://gafferongames.com/post/fix_your_timestep/)、[快照插值](https://gafferongames.com/post/snapshot_interpolation/)。这些是方法参考，不表示引入其他引擎的运行依赖。
+制作参考：[Blockbench](https://www.blockbench.net/wiki/guides/blockbench-overview-tips/)、[PAL 播放控制](https://docs.zigythebird.com/pal/gettingstarted/how_to_play_animations/)、[PAL 第一人称](https://docs.zigythebird.com/pal/features/first_person/)、[固定时间步](https://gafferongames.com/post/fix_your_timestep/)、[快照插值](https://gafferongames.com/post/snapshot_interpolation/)。
 
 ## 地形表现
 

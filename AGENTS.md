@@ -2,39 +2,39 @@
 
 ## Project map
 
-Cursed Oath (咒誓) is a Minecraft 26.3 Fabric combat mod. Read [README](README.md) for setup and controls, [design](docs/design.zh-CN.md) for scope, and [architecture](docs/architecture.zh-CN.md) for ownership and lifecycle constraints.
+Cursed Oath (咒誓) is a Minecraft 26.3 Fabric combat mod. Read [README](README.md) for setup, [design](docs/design.zh-CN.md) for scope, and [architecture](docs/architecture.zh-CN.md) for state ownership.
 
-The package root is `io.github.romeoahmed.cursedoath`:
+Under `io.github.romeoahmed.cursedoath`:
 
-- `src/main/kotlin/`: server combat, techniques, domains, terrain, networking, and commands.
-- `src/client/kotlin/`: input, GUI, animation, rendering, and sound; feature visuals live in `render/domain/` and `render/limitless/`.
-- `src/main/java/` and `src/client/java/`: narrow vanilla mixins.
-- `src/main/resources/`: metadata, translations, assets, and data.
-- `src/test/` and `src/gametest/`: unit tests and a separate test mod. GameTests follow production packages; shared fixtures stay at the package root.
+- `src/main/java/`: common combat, techniques, domains, terrain, networking, commands, and mixins.
+- `src/client/java/`: input, GUI, animation, rendering, sound, and client mixins.
+- `src/main/resources/`: metadata, icon, Mixin configuration, and server data.
+- `src/client/resources/`: translations and audiovisual assets.
+- `src/test/`: JUnit tests; `src/gametest/`: isolated test mod, grouped by production package.
 - `art/`: editable assets and tools; follow the [asset instructions](art/README.md).
 
 ## Build and verify
 
-Use JDK 25 and the wrapper from the repository root (`gradlew.bat` on Windows).
+Use JDK 25 and the repository wrapper (`gradlew.bat` on Windows).
 
-- `./gradlew genSources`: inspect targets before changing mixins or version-sensitive calls.
-- `./gradlew spotlessApply`: apply ktlint, default Palantir Java Format, and text formatting. Run before other checks.
-- `./gradlew build`: compile, run unit/server tests, check formatting, Detekt, and coverage, then package JARs.
-- `./gradlew runClientGameTest`: run the complete Vulkan client suite after `build`; requires a graphics session. Its 30-second preflight rejects unavailable graphics, and tests reject backend fallback.
+- `./gradlew genSources`: inspect generated targets before version-sensitive changes.
+- `./gradlew spotlessApply`: format Java and normalize text; run separately before checks.
+- `./gradlew build`: compile, check formatting and static analysis, run unit/server tests and coverage, package JARs.
+- `./gradlew runClientGameTest`: run the complete Vulkan suite after `build`; requires a graphics session. Graphics preflight times out after 30 seconds; tests reject backend fallback.
 - `./gradlew test --tests '*ClassName'` or `./gradlew runGameTest`: focused verification.
 
-Inspect captures in `build/run/clientGameTest/screenshots/`; preserve them before server tests, whose cleanup can delete them. Pixel assertions establish appearance and expiry, not visual quality. Text-only changes need formatting and link checks. Report only checks actually performed.
+Inspect `build/run/clientGameTest/screenshots/`; preserve captures before server tests, whose cleanup can delete them. Pixel assertions cannot establish visual quality. Text-only changes need formatting and link checks; validate edited Javadoc with the JDK doclet. Report checks actually performed.
 
-## Implementation and tests
+## Code and tests
 
-Follow `.editorconfig` and formatter output. Match filenames to types; use camelCase members and UPPER_SNAKE_CASE constants. Keep client imports out of common code. Prefer Minecraft/Fabric APIs; justify dependencies.
+Use Java 25 without preview features and Gradle Kotlin DSL. Follow `.editorconfig` and default Palantir formatting. Match filenames to types. Use JSpecify nullness annotations and fix Error Prone/NullAway findings without broad suppressions. Keep client imports out of common code; prefer native Minecraft/Fabric APIs.
 
-Keep combat and terrain server-owned, world access on its owning thread, and render snapshots immutable. Preserve resource IDs, save keys, and wire IDs. Create identifiers with `CursedOath.id(...)`.
+Keep simulation server-owned, world access on its owning thread, and render submissions isolated from live entities. Preserve resource IDs, save keys, and wire IDs; create identifiers with `CursedOath.id(...)`.
 
-Test behavior with `kotlin-test-junit5`/JUnit 6 or GameTest. Use scoped fixtures and `onFinish` cleanup; never clear shared runtime state from a test. Use spectators for isolated visual captures and ordinary players for input tests. Kover requires 90% line coverage for `CursedEnergy` and `RequestGate`. Fix findings without baselines or broad suppressions.
+Test behavior and boundary cases. Use scoped fixtures with completion cleanup, never global runtime clearing. Use spectators for isolated visual captures and ordinary players for input tests. JaCoCo requires 90% line coverage for `CursedEnergy` and `RequestGate`.
 
 ## Text and contributions
 
-Align `en_us`, `zh_cn`, and `ja_jp` keys and placeholders; follow [terminology](docs/localization.zh-CN.md). Separate implemented behavior, plans, and canon evidence. Comments explain constraints or reasoning.
+Keep three-language keys and placeholders aligned; follow [terminology](docs/localization.zh-CN.md). Separate implementation, plans, and canon evidence. Use `///` Javadoc for declaration contracts and `//` for local reasoning; avoid comments that repeat code.
 
-Use imperative commit subjects. PRs describe behavior, relevant issues, validation, and screenshots for visible changes. Exclude builds, caches, and run directories.
+Use concise, imperative Conventional Commits. PRs explain behavior and validation, link relevant issues, and include screenshots for visual changes. Exclude builds, caches, and run directories.

@@ -1,6 +1,5 @@
 # Build output and caches
 .gradle/
-.kotlin/
 __pycache__/
 build/
 out/

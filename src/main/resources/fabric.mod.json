@@ -9,16 +9,10 @@
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-			{
-				"value": "io.github.romeoahmed.cursedoath.CursedOath",
-				"adapter": "kotlin"
-			}
+			"io.github.romeoahmed.cursedoath.CursedOath"
 		],
 		"client": [
-			{
-				"value": "io.github.romeoahmed.cursedoath.client.CursedOathClient",
-				"adapter": "kotlin"
-			}
+			"io.github.romeoahmed.cursedoath.client.CursedOathClient"
 		]
 	},
 	"mixins": [
@@ -29,7 +23,6 @@
 		"minecraft": "~26.3",
 		"java": ">=25",
 		"fabric-api": ">=${fabric_api_version}",
-		"fabric-language-kotlin": ">=${fabric_kotlin_version}",
 		"player_animation_library": "=1.2.7+mc.26.3"
 	}
 }

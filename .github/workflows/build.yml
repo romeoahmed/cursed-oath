@@ -13,43 +13,38 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
-      - name: checkout repository
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: setup jdk
-        uses: actions/setup-java@v6
+      - uses: actions/setup-java@v6
         with:
-          java-version: '25'
-          distribution: 'microsoft'
-      - name: setup gradle
-        uses: gradle/actions/setup-gradle@v6
-      - name: build
-        run: ./gradlew build
+          java-version: "25"
+          distribution: "microsoft"
+      - uses: gradle/actions/setup-gradle@v6
       - name: verify model export
         run: |
           python3 -m unittest discover -s art/shrine
           python3 art/shrine/export.py --check
+      - name: build and verify
+        run: ./gradlew build
       - name: install Vulkan runtime
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb xauth mesa-vulkan-drivers
       - name: Vulkan client game tests
         timeout-minutes: 10
         env:
           SDL_VIDEO_DRIVER: x11
-          VK_DRIVER_FILES: /usr/share/vulkan/icd.d/lvp_icd.json
-        run: xvfb-run -a -s "-screen 0 1280x1024x24" ./gradlew runClientGameTest
+        run: xvfb-run -a ./gradlew runClientGameTest
       - name: capture verification reports
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: Verification
           path: |
             build/reports/
             build/test-results/
-            build/run/gameTest/logs/
-            build/run/clientGameTest/logs/
-            build/run/clientGameTest/crash-reports/
-            build/run/clientGameTest/screenshots/
+            build/run/**/logs/
+            build/run/**/crash-reports/
+            build/run/**/screenshots/
       - name: capture build artifacts
         uses: actions/upload-artifact@v7
         with:

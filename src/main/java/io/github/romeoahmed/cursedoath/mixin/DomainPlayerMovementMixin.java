@@ -1,5 +1,6 @@
 package io.github.romeoahmed.cursedoath.mixin;
 
+import com.google.errorprone.annotations.Keep;
 import io.github.romeoahmed.cursedoath.domain.DomainInteractions;
 import io.github.romeoahmed.cursedoath.domain.Domains;
 import net.minecraft.network.protocol.game.ClientboundMoveVehiclePacket;
@@ -16,6 +17,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ServerGamePacketListenerImpl.class)
 abstract class DomainPlayerMovementMixin {
+    @Keep
     @Inject(
             method = "handleMovePlayer",
             at =
@@ -30,13 +32,14 @@ abstract class DomainPlayerMovementMixin {
         Vec3 requested = new Vec3(packet.getX(player.getX()), packet.getY(player.getY()), packet.getZ(player.getZ()))
                 .subtract(player.position());
         if (!Double.isFinite(requested.lengthSqr())) return;
-        Vec3 permitted = DomainInteractions.INSTANCE.movement(player, requested);
+        Vec3 permitted = DomainInteractions.movement(player, requested);
         if (permitted.distanceToSqr(requested) > 1.0e-10) {
             player.connection.teleport(player.getX(), player.getY(), player.getZ(), player.getYRot(), player.getXRot());
             ci.cancel();
         }
     }
 
+    @Keep
     @Inject(
             method = "handleMoveVehicle",
             at =
@@ -46,14 +49,15 @@ abstract class DomainPlayerMovementMixin {
                                     "Lnet/minecraft/network/protocol/PacketUtils;ensureRunningOnSameThread(Lnet/minecraft/network/protocol/Packet;Lnet/minecraft/network/PacketListener;Lnet/minecraft/server/level/ServerLevel;)V",
                             shift = At.Shift.AFTER),
             cancellable = true)
+    @SuppressWarnings("ReferenceEquality") // Check the actual controlled instance.
     private void cursedOath$validateVehicle(ServerboundMoveVehiclePacket packet, CallbackInfo ci) {
         ServerPlayer player = ((ServerGamePacketListenerImpl) (Object) this).player;
         Entity vehicle = player.getRootVehicle();
         if (vehicle == player || vehicle.getControllingPassenger() != player) return;
         Vec3 requested = packet.movingTo().position().subtract(vehicle.position());
         if (!Double.isFinite(requested.lengthSqr())) return;
-        if (Domains.INSTANCE.isOverloaded(player)
-                || DomainInteractions.INSTANCE.movement(vehicle, requested).distanceToSqr(requested) > 1.0e-10) {
+        if (Domains.isOverloaded(player)
+                || DomainInteractions.movement(vehicle, requested).distanceToSqr(requested) > 1.0e-10) {
             player.connection.send(ClientboundMoveVehiclePacket.fromEntity(vehicle));
             ci.cancel();
         }

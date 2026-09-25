@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MODEL = Path(__file__).with_name("shrine.bbmodel")
-OUTPUT = ROOT / "src/main/resources/assets/cursed-oath/models/domain/shrine.json"
+OUTPUT = ROOT / "src/client/resources/assets/cursed-oath/models/domain/shrine.json"
 
 
 def transform(point, element):
@@ -43,7 +43,7 @@ def shaded(rgb, vertices):
 
 
 def bake(model):
-    """Return shaded quads in block units; require group transforms to be applied to elements."""
+    """Bake visible faces without mutating the model; reject unapplied group state."""
 
     def check_groups(nodes):
         for node in nodes:

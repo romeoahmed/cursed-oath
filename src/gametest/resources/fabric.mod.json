@@ -15,7 +15,7 @@
 			"io.github.romeoahmed.cursedoath.technique.TechniqueImpactGameTest",
 			"io.github.romeoahmed.cursedoath.technique.TechniqueOrbGameTest",
 			"io.github.romeoahmed.cursedoath.domain.DomainGameTest",
-			"io.github.romeoahmed.cursedoath.technique.InfinityGameTest",
+			"io.github.romeoahmed.cursedoath.technique.InfinityDefenseGameTest",
 			"io.github.romeoahmed.cursedoath.domain.DomainBarrierGameTest",
 			"io.github.romeoahmed.cursedoath.domain.DomainDamageGameTest"
 		],

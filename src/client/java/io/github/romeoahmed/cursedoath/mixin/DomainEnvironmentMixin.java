@@ -1,5 +1,6 @@
 package io.github.romeoahmed.cursedoath.mixin;
 
+import com.google.errorprone.annotations.Keep;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.renderpearl.api.commands.RenderPass;
@@ -19,20 +20,24 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Hide scenery for the extracted frame; world blocks and entity simulation remain untouched. */
+/// Hide scenery for the extracted frame; world blocks and entity simulation remain untouched.
 @Mixin(LevelRenderer.class)
 abstract class DomainEnvironmentMixin {
     @Unique
     private boolean cursedOath$void;
 
+    @Keep
     @Inject(method = "submitFeatures", at = @At("HEAD"))
     private void cursedOath$environment(
-            LevelRenderState state, SubmitNodeCollector collector, boolean outline, CallbackInfo ci) {
+            LevelRenderState state,
+            SubmitNodeCollector unusedCollector,
+            boolean unusedOutline,
+            CallbackInfo unusedCallback) {
         cursedOath$void = state.entityRenderStates.stream()
                 .anyMatch(entity -> entity instanceof DomainRenderer.State domain
-                        && domain.getClosed()
+                        && domain.closed()
                         && state.cameraRenderState.pos.distanceToSqr(entity.x, entity.y, entity.z)
-                                < domain.getRadius() * domain.getRadius());
+                                < domain.radius() * domain.radius());
         if (cursedOath$void) {
             state.blockEntityRenderStates.clear();
             state.blockBreakingRenderStates.clear();
@@ -42,6 +47,7 @@ abstract class DomainEnvironmentMixin {
         }
     }
 
+    @Keep
     @WrapOperation(
             method = {"executeSolid", "executeClassicTransparency"},
             at =
@@ -60,6 +66,7 @@ abstract class DomainEnvironmentMixin {
         if (!cursedOath$void) original.call(chunks, group, pass, sampler, atlas, wireframe);
     }
 
+    @Keep
     @WrapOperation(
             method = "executeOit",
             at =

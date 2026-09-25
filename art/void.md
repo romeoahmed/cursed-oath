@@ -1,6 +1,6 @@
 # Unlimited Void environment
 
-Runtime asset: [void.png](../src/main/resources/assets/cursed-oath/textures/environment/void.png), a 1774 × 887 panorama generated with ImageGen. Supplied anime and manga images informed composition and stellar density; the reference images are not shipped as textures.
+Runtime asset: [void.png](../src/client/resources/assets/cursed-oath/textures/environment/void.png), a 1774 × 887 panorama generated with ImageGen. Supplied anime and manga images informed composition and stellar density; the reference images are not shipped as textures.
 
 ## Composition
 
@@ -10,6 +10,6 @@ The cloud trail extends left in the texture and appears to the viewer's right af
 
 ## Runtime mapping
 
-A camera-centered sphere retains the casting orientation as the viewer turns or moves. The native textured vertex shader supplies UVs; [void.fsh](../src/main/resources/assets/cursed-oath/shaders/core/void.fsh) samples the static painting and fades it in with a black seam. The exterior barrier stays at the domain origin; the panorama does not change world collisions.
+A camera-centered sphere retains the casting orientation as the viewer turns or moves. The sphere mesh supplies UVs through the native textured vertex shader; [void.fsh](../src/client/resources/assets/cursed-oath/shaders/core/void.fsh) samples the static painting and fades it in with a black seam. The exterior barrier stays at the domain origin; the panorama does not change world collisions.
 
 Check the mapped result in-game: forward, sideways, at the seam, and toward both poles. Flat-image composition alone does not establish how the environment reads around the player.
