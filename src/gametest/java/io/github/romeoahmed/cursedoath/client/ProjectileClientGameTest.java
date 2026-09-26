@@ -23,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
 public final class ProjectileClientGameTest implements FabricClientGameTest {
     private static final BlockPos CUT = new BlockPos(0, -44, 3);
     private static final double FLIGHT_Z = 9.0;
-    private static final int DEBRIS_EXPIRY = 40, POSE_TICKS = 4, RELEASE_TICKS = 2;
+    private static final int DEBRIS_EXPIRY = 40, IMPACT_EXPIRY = 20, POSE_TICKS = 4, RELEASE_TICKS = 2;
 
     @Override
     public void runTest(ClientGameTestContext context) {
@@ -67,6 +67,8 @@ public final class ProjectileClientGameTest implements FabricClientGameTest {
                 if (entity instanceof TechniqueProjectile) return false;
             return true;
         });
+        // Red's impact outlives its projectile and must not leak into the next capture.
+        if (technique == Technique.RED) context.waitTicks(IMPACT_EXPIRY);
     }
 
     private static void cleave(ClientGameTestContext context, TestSingleplayerContext world) {

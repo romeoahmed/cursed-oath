@@ -7,10 +7,10 @@ import static java.util.Objects.requireNonNull;
 import io.github.romeoahmed.cursedoath.combat.CombatRuntime;
 import io.github.romeoahmed.cursedoath.combat.Defense;
 import io.github.romeoahmed.cursedoath.combat.SorcererAttachments;
+import io.github.romeoahmed.cursedoath.combat.SorcererProfile;
 import io.github.romeoahmed.cursedoath.technique.InfinityDefense;
 import io.github.romeoahmed.cursedoath.technique.Technique;
 import io.github.romeoahmed.cursedoath.world.TerrainDestruction;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
@@ -29,6 +29,47 @@ import org.jspecify.annotations.NullMarked;
 public final class DomainGameTest {
     private static final BlockPos WALL = new BlockPos(2, 2, 4);
 
+    @GameTest(environment = "cursed-oath-test:domain_terrain", structure = "cursed-oath-test:arena", maxTicks = 160)
+    public void groundedShrinePreservesSlabSupportAndFoundationAfterCasterMoves(GameTestHelper helper) {
+        var caster = caster(helper);
+        var slab = new BlockPos(14, 10, 14);
+        var foundation = new BlockPos(14, 9, 15);
+        var wall = new BlockPos(14, 12, 15);
+        helper.setBlock(slab, Blocks.STONE_SLAB);
+        helper.setBlock(foundation, Blocks.STONE);
+        helper.setBlock(wall, Blocks.STONE);
+        caster.setPos(helper.absoluteVec(new Vec3(14.5, 10.5, 14.5)));
+        caster.setAttached(SorcererAttachments.PROFILE, new SorcererProfile().withDomainRadius(16));
+        Domains.open(caster, Technique.MALEVOLENT_SHRINE);
+        caster.setPos(caster.position().add(0, 5, 0));
+        helper.succeedWhen(() -> {
+            helper.assertBlockPresent(Blocks.AIR, wall);
+            helper.assertBlockPresent(Blocks.STONE_SLAB, slab);
+            helper.assertBlockPresent(Blocks.STONE, foundation);
+        });
+    }
+
+    @GameTest(environment = "cursed-oath-test:domain_terrain", structure = "cursed-oath-test:arena", maxTicks = 160)
+    public void airborneShrineCutsBelowButLeavesTheSphericalCorners(GameTestHelper helper) {
+        var caster = caster(helper);
+        caster.setPos(helper.absoluteVec(new Vec3(14.5, 16, 14.5)));
+        caster.setAttached(SorcererAttachments.PROFILE, new SorcererProfile().withDomainRadius(16));
+        var below = new BlockPos(14, 8, 14);
+        var corner = new BlockPos(29, 29, 29);
+        helper.setBlock(below, Blocks.STONE);
+        helper.setBlock(corner, Blocks.STONE);
+        var inside = stationaryTarget(helper, EntityTypes.VILLAGER, new BlockPos(14, 23, 14));
+        var outside = stationaryTarget(helper, EntityTypes.VILLAGER, corner.above());
+        Domains.open(caster, Technique.MALEVOLENT_SHRINE);
+        Domains.tick();
+        helper.assertTrue(inside.getHealth() < inside.getMaxHealth(), "Sure hits extend vertically inside the sphere");
+        helper.assertTrue(outside.getHealth() == outside.getMaxHealth(), "Sphere corners cannot receive sure hits");
+        helper.succeedWhen(() -> {
+            helper.assertBlockPresent(Blocks.AIR, below);
+            helper.assertBlockPresent(Blocks.STONE, corner);
+        });
+    }
+
     @GameTest(environment = "cursed-oath-test:domains")
     @SuppressWarnings("ReferenceEquality") // Verify live entity ownership, not equality by entity ID.
     public void collapseDuringSureHitStopsRemainingTargetsAndTerrain(GameTestHelper helper) {
@@ -37,8 +78,8 @@ public final class DomainGameTest {
                 stationaryTarget(helper, EntityTypes.HUSK, new BlockPos(2, 1, 6)),
                 stationaryTarget(helper, EntityTypes.HUSK, new BlockPos(3, 1, 6)));
         var domain = Domains.open(caster, Technique.MALEVOLENT_SHRINE);
-        allowDamage(helper, (target, source, amount) -> {
-            if (targets.contains(target) && source.getDirectEntity() == domain) Domains.end(domain);
+        allowDamage(helper, targets, (target, source, amount) -> {
+            if (source.getDirectEntity() == domain) Domains.end(domain);
             return true;
         });
         Domains.tick();
@@ -63,8 +104,8 @@ public final class DomainGameTest {
                 stationaryTarget(helper, EntityTypes.HUSK, new BlockPos(3, 1, 6)));
         var domain = Domains.open(caster, Technique.MALEVOLENT_SHRINE);
         var relocated = new AtomicBoolean();
-        allowDamage(helper, (target, source, amount) -> {
-            if (!relocated.get() && source.getDirectEntity() == domain && targets.contains(target)) {
+        allowDamage(helper, targets, (target, source, amount) -> {
+            if (!relocated.get() && source.getDirectEntity() == domain) {
                 relocated.set(true);
                 for (var other : targets)
                     if (other != target) other.setPos(domain.position().add(domain.radius() * 2, 0.0, 0.0));
@@ -153,12 +194,7 @@ public final class DomainGameTest {
         var caster = caster(helper);
         var target = stationaryTarget(helper, EntityTypes.HUSK, new BlockPos(2, 1, 6));
         helper.setBlock(WALL, Blocks.BEDROCK);
-        var reservations = new ArrayList<TerrainDestruction.Work>();
-        while (true) {
-            var reservation = reserveTerrain(helper, caster);
-            if (reservation == null) break;
-            reservations.add(reservation);
-        }
+        var reservations = saturateTerrain(helper, caster);
         try {
             Domains.open(caster, Technique.MALEVOLENT_SHRINE);
             Domains.tick();

@@ -12,35 +12,58 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 public final class BarrierRenderer {
-    private static final float BOUNDARY_ALPHA = 0.25f;
     private static final double RADIUS = 3.0;
-    private static final int SIMPLE_COLOR = 0xE2E9EC;
-    private static final int AMPLIFICATION_COLOR = 0xB5C6D8;
-    private static final double AURA_RADIUS = 0.65;
-    private static final float AURA_ALPHA = 0.2f;
-    private static final double GROUND_OFFSET = 0.025;
-    private static final int SEGMENTS = 24;
-    private static final int FULL_STRENGTH = 100;
-    private static final double SEGMENT_FILL = 0.8;
-    private static final double SEGMENT_WIDTH = 0.04;
+    private static final Edge[] EDGES = edges();
 
-    private record State(Vec3 position, double height, int strength) {}
+    private record Edge(Vec3 start, Vec3 end, Vec3 width, float threshold) {}
+
+    private static Edge[] edges() {
+        var edges = new Edge[96];
+        for (int i = 0; i < edges.length; i++) {
+            double a = i * Math.TAU / edges.length, b = (i + 1) * Math.TAU / edges.length;
+            edges[i] = new Edge(
+                    new Vec3(Math.cos(a) * RADIUS, 0.035, Math.sin(a) * RADIUS),
+                    new Vec3(Math.cos(b) * RADIUS, 0.035, Math.sin(b) * RADIUS),
+                    new Vec3(Math.cos(a), 0, Math.sin(a)).scale(-0.045),
+                    (i * 37 % 97) / 97f);
+        }
+        return edges;
+    }
+
+    private record State(Vec3 position, double height, double width, int strength, float age) {}
 
     private static final RenderStateDataKey<List<State>> KEY = RenderStateDataKey.create(() -> "cursed-oath:barriers");
-    private static final EffectMesh.Basis AXES = new EffectMesh.Basis(new Vec3(1, 0, 0), new Vec3(0, 0, 1));
 
     private BarrierRenderer() {}
 
-    private static void simple(EffectMesh mesh, int strength) {
-        var center = new Vec3(0, GROUND_OFFSET, 0);
-        mesh.ring(center, AXES, RADIUS, SIMPLE_COLOR, BOUNDARY_ALPHA);
-        // The faint boundary preserves the radius as bright segments erode.
-        int segments = Math.clamp(strength * SEGMENTS / FULL_STRENGTH, 0, SEGMENTS);
-        for (int index = 0; index < segments; index++) {
-            double angle = index * 2 * Math.PI / SEGMENTS, end = angle + 2 * Math.PI / SEGMENTS * SEGMENT_FILL;
-            var a = new Vec3(Math.cos(angle), 0, Math.sin(angle)).scale(RADIUS);
-            var b = new Vec3(Math.cos(end), 0, Math.sin(end)).scale(RADIUS);
-            mesh.ribbon(center.add(a), center.add(b), a.scale(-SEGMENT_WIDTH), SIMPLE_COLOR);
+    private static void simple(EffectMesh mesh, int strength, float age) {
+        float integrity = strength / 100f;
+        for (int i = 0; i < EDGES.length; i++) {
+            var edge = EDGES[i];
+            // Distributed gaps read as a peeling barrier, not a circular progress meter.
+            if (edge.threshold() > integrity) continue;
+            mesh.ribbon(edge.start(), edge.end(), edge.width(), 0xE3E7ED, 0.9f);
+            if (integrity < 1 && edge.threshold() > integrity - 0.12) {
+                double lift = 0.12 + 0.12 * Math.sin(age * 0.12 + i);
+                mesh.slash(edge.start(), edge.end().add(0, lift, 0), edge.width(), 0xC3D1E5, 0.45f);
+            }
+        }
+    }
+
+    private static void amplification(EffectMesh mesh, State state) {
+        double radius = state.width() * 0.5 + 0.08;
+        for (int strand = 0; strand < 10; strand++) {
+            double angle = strand * Math.TAU / 10;
+            var points = new Vec3[9];
+            for (int step = 0; step < points.length; step++) {
+                double t = step / 8.0;
+                double flow = angle + 0.12 * Math.sin(t * 8 - state.age() * 0.12 + strand);
+                double shoulder = radius * (0.7 + 0.3 * Math.sin(t * Math.PI));
+                points[step] =
+                        new Vec3(Math.cos(flow) * shoulder, t * (state.height() + 0.08), Math.sin(flow) * shoulder);
+            }
+            var width = new Vec3(-Math.sin(angle), 0, Math.cos(angle)).scale(0.04);
+            mesh.ribbon(points, width, 0xCBD0DD, 0.3f);
         }
     }
 
@@ -50,7 +73,13 @@ public final class BarrierRenderer {
             var states = new ArrayList<State>();
             for (var player : context.level().players()) {
                 int strength = BarrierState.get(player);
-                if (strength != 0) states.add(new State(player.getPosition(partial), player.getBbHeight(), strength));
+                if (strength != 0)
+                    states.add(new State(
+                            player.getPosition(partial),
+                            player.getBbHeight(),
+                            player.getBbWidth(),
+                            strength,
+                            player.tickCount + partial));
             }
             context.levelState().setData(KEY, List.copyOf(states));
         });
@@ -69,13 +98,9 @@ public final class BarrierRenderer {
                 context.submitNodeCollector()
                         .submitCustomGeometry(pose, EffectRenderTypes.ADDITIVE, (matrix, vertices) -> {
                             var mesh = new EffectMesh(matrix, vertices);
-                            if (state.strength() > 0) simple(mesh, state.strength());
-                            else
-                                mesh.sphere(
-                                        new Vec3(0, state.height() / 2, 0),
-                                        AURA_RADIUS,
-                                        AMPLIFICATION_COLOR,
-                                        AURA_ALPHA);
+                            if (state.strength() > 0) simple(mesh, state.strength(), state.age());
+                            else if (camera.distanceToSqr(state.position().add(0, state.height() / 2, 0)) > 1)
+                                amplification(mesh, state);
                         });
                 pose.popPose();
             }

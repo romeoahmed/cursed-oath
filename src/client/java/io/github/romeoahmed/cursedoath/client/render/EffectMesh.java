@@ -101,8 +101,7 @@ public final class EffectMesh {
 
     public void ribbon(Vec3[] points, Vec3 width, int rgb, float alpha) {
         int color = color(rgb, alpha);
-        for (int i = 0; i < points.length - 1; i++)
-            quad(points[i], points[i].add(width), points[i + 1].add(width), points[i + 1], color);
+        for (int i = 0; i < points.length - 1; i++) ribbon(points[i], points[i + 1], width, width, color);
     }
 
     public void ribbon(Vec3 start, Vec3 end, Vec3 width, int rgb) {
@@ -110,12 +109,27 @@ public final class EffectMesh {
     }
 
     public void ribbon(Vec3 start, Vec3 end, Vec3 width, int rgb, float alpha) {
-        quad(start, start.add(width), end.add(width), end, color(rgb, alpha));
+        ribbon(start, end, width, width, color(rgb, alpha));
+    }
+
+    public void ribbon(Vec3 start, Vec3 end, Vec3 startWidth, Vec3 endWidth, int rgb, float alpha) {
+        ribbon(start, end, startWidth, endWidth, color(rgb, alpha));
+    }
+
+    private void ribbon(Vec3 start, Vec3 end, Vec3 startWidth, Vec3 endWidth, int color) {
+        vertex(start, color);
+        vertex(start.x + startWidth.x, start.y + startWidth.y, start.z + startWidth.z, color);
+        vertex(end.x + endWidth.x, end.y + endWidth.y, end.z + endWidth.z, color);
+        vertex(end, color);
     }
 
     public void slash(Vec3 a, Vec3 b, Vec3 width, int rgb, float alpha) {
-        var middle = a.lerp(b, 0.5);
-        quad(a, middle.add(width), b, middle.subtract(width), color(rgb, alpha));
+        double x = (a.x + b.x) * 0.5, y = (a.y + b.y) * 0.5, z = (a.z + b.z) * 0.5;
+        int color = color(rgb, alpha);
+        vertex(a, color);
+        vertex(x + width.x, y + width.y, z + width.z, color);
+        vertex(b, color);
+        vertex(x - width.x, y - width.y, z - width.z, color);
     }
 
     public void quad(Vec3 a, Vec3 b, Vec3 c, Vec3 d, int color) {
@@ -126,8 +140,11 @@ public final class EffectMesh {
     }
 
     private void vertex(Vec3 point, int color) {
-        vertices.addVertex(pose, (float) point.x, (float) point.y, (float) point.z)
-                .setColor(color);
+        vertex(point.x, point.y, point.z, color);
+    }
+
+    private void vertex(double x, double y, double z, int color) {
+        vertices.addVertex(pose, (float) x, (float) y, (float) z).setColor(color);
     }
 
     private int color(int rgb, float alpha) {

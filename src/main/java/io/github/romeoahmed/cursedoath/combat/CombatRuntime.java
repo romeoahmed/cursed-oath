@@ -7,7 +7,6 @@ import io.github.romeoahmed.cursedoath.network.RequestGate;
 import io.github.romeoahmed.cursedoath.network.TechniqueEvent;
 import io.github.romeoahmed.cursedoath.technique.InfinityDefense;
 import io.github.romeoahmed.cursedoath.technique.Technique;
-import io.github.romeoahmed.cursedoath.world.TerrainDestruction;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -80,7 +79,6 @@ public final class CombatRuntime {
             WORLDS.clear();
             CONNECTIONS.clear();
             SNAPSHOTS.clear();
-            TerrainDestruction.clear();
         });
     }
 
@@ -117,7 +115,20 @@ public final class CombatRuntime {
 
     public static boolean hasInfinity(ServerPlayer player) {
         var fighter = existing(player);
-        return fighter != null && fighter.infinity() && player.isAlive() && !player.isSpectator();
+        return fighter != null
+                && fighter.infinity()
+                && player.isAlive()
+                && !player.isRemoved()
+                && !player.isSpectator();
+    }
+
+    public static boolean hasAmplification(ServerPlayer player) {
+        var fighter = existing(player);
+        return fighter != null
+                && fighter.defense().amplification()
+                && player.isAlive()
+                && !player.isRemoved()
+                && !player.isSpectator();
     }
 
     public static Collection<Fighter> fighters(ServerLevel level) {

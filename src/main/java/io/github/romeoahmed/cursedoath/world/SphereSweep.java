@@ -6,14 +6,14 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
-/// Exact sphere/AABB contact: between box-face crossings, squared distance is quadratic.
+/// Continuous sphere/AABB contact with a reusable query buffer; instances are not thread-safe.
 public final class SphereSweep {
     private final Vec3 start;
     private final Vec3 end;
     private final AABB path;
     private final Vec3 motion;
     private final double radiusSquared;
-    // Queries run sequentially on the owning server thread, including queued terrain segments.
+    // Squared distance is quadratic between box-face crossings; reuse their times for each query.
     private final double[] times = new double[8];
 
     public SphereSweep(Vec3 start, Vec3 end, double radius) {
@@ -24,6 +24,10 @@ public final class SphereSweep {
         radiusSquared = radius * radius;
     }
 
+    /// Finds first contact along the segment, including tangency and initial overlap.
+    ///
+    /// @param box stationary target bounds
+    /// @return segment fraction in `[0, 1]`, or `null` when there is no contact
     public @Nullable Double entry(AABB box) {
         if (box.distanceToSqr(path) > radiusSquared) return null;
         if (box.distanceToSqr(start) <= radiusSquared) return 0.0;

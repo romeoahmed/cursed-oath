@@ -2,9 +2,9 @@
 
 ## Project map
 
-Cursed Oath (咒誓) is a Minecraft 26.3 Fabric combat mod. Read [README](README.md) for setup, [design](docs/design.zh-CN.md) for scope, and [architecture](docs/architecture.zh-CN.md) for state ownership.
+Cursed Oath (咒誓) is a Minecraft 26.3 Fabric combat mod. Read [README](README.md) for setup, [CONTRIBUTING](CONTRIBUTING.md) for the contributor workflow, [design](docs/design.zh-CN.md) for scope, and [architecture](docs/architecture.zh-CN.md) for state ownership. This file provides coding-agent instructions; human-facing guidance belongs in CONTRIBUTING.
 
-Under `io.github.romeoahmed.cursedoath`:
+Java packages use `io.github.romeoahmed.cursedoath`:
 
 - `src/main/java/`: common combat, techniques, domains, terrain, networking, commands, and mixins.
 - `src/client/java/`: input, GUI, animation, rendering, sound, and client mixins.
@@ -20,10 +20,10 @@ Use JDK 25 and the repository wrapper (`gradlew.bat` on Windows).
 - `./gradlew genSources`: inspect generated targets before version-sensitive changes.
 - `./gradlew spotlessApply`: format Java and normalize text; run separately before checks.
 - `./gradlew build`: compile, check formatting and static analysis, run unit/server tests and coverage, package JARs.
-- `./gradlew runClientGameTest`: run the complete Vulkan suite after `build`; requires a graphics session. Graphics preflight times out after 30 seconds; tests reject backend fallback.
+- `./gradlew runClientGameTest`: run the complete Vulkan suite after `build`; requires a graphics session. The preflight and suite reject backend fallback.
 - `./gradlew test --tests '*ClassName'` or `./gradlew runGameTest`: focused verification.
 
-Inspect `build/run/clientGameTest/screenshots/`; preserve captures before server tests, whose cleanup can delete them. Pixel assertions cannot establish visual quality. Text-only changes need formatting and link checks; validate edited Javadoc with the JDK doclet. Report checks actually performed.
+Inspect `build/run/clientGameTest/screenshots/`; preserve captures before server tests, whose cleanup can delete them. Pixel assertions cannot establish visual quality. For documentation or comment-only changes, run formatting and link checks instead of game tests. Validate edited Javadoc with the JDK 25 standard doclet, including private declarations and reference checks. Report checks actually performed.
 
 ## Code and tests
 
@@ -35,6 +35,6 @@ Test behavior and boundary cases. Use scoped fixtures with completion cleanup, n
 
 ## Text and contributions
 
-Keep three-language keys and placeholders aligned; follow [terminology](docs/localization.zh-CN.md). Separate implementation, plans, and canon evidence. Use `///` Javadoc for declaration contracts and `//` for local reasoning; avoid comments that repeat code.
+Keep three-language keys and placeholders aligned; follow [terminology](docs/localization.zh-CN.md). Separate implementation, plans, and canon evidence. Use `///` Javadoc for declaration contracts: summarize the behavior, then document non-obvious units, ownership, null results, or side effects. Use `//` for local reasoning. Do not add boilerplate for self-explanatory declarations or repeat the implementation.
 
 Use concise, imperative Conventional Commits. PRs explain behavior and validation, link relevant issues, and include screenshots for visual changes. Exclude builds, caches, and run directories.

@@ -42,6 +42,7 @@ public final class DomainEntity extends Entity {
     ServerPlayer caster;
 
     TerrainDestruction.@Nullable Work terrain;
+    double ground = Double.NEGATIVE_INFINITY;
 
     public DomainEntity(EntityType<? extends DomainEntity> type, Level level) {
         super(type, level);
@@ -90,6 +91,10 @@ public final class DomainEntity extends Entity {
 
     void configure(ServerPlayer owner, Technique ability, double size) {
         caster = owner;
+        // Snapshot actual block support, including slabs; jumping later cannot move the excavation floor.
+        var feet = owner.getBoundingBox();
+        var support = new AABB(feet.minX, feet.minY - 0.06, feet.minZ, feet.maxX, feet.minY, feet.maxZ);
+        if (owner.level().getBlockCollisions(owner, support).iterator().hasNext()) ground = owner.getY();
         setPos(owner.position());
         setYRot(owner.getYRot());
         entityData.set(TECHNIQUE, ability.wireId());

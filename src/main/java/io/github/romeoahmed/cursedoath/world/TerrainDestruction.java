@@ -1,5 +1,6 @@
 package io.github.romeoahmed.cursedoath.world;
 
+import io.github.romeoahmed.cursedoath.CursedOath;
 import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -8,9 +9,13 @@ import java.util.NoSuchElementException;
 import java.util.PriorityQueue;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import net.fabricmc.fabric.api.attachment.v1.AttachmentRegistry;
+import net.fabricmc.fabric.api.attachment.v1.AttachmentType;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ClipContext;
@@ -20,7 +25,7 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
-/// Bounded, round-robin excavation. Reservations include casts still preparing.
+/// Server-owned, budgeted excavation shared across dimensions; reservations include preparing casts.
 public final class TerrainDestruction {
     private TerrainDestruction() {}
 
@@ -31,7 +36,12 @@ public final class TerrainDestruction {
     private static final long NANOS_PER_TICK = 4_000_000L;
     private static final long LIFETIME = 600;
     private static final int MAX_SEGMENTS = 64;
-    private static final ArrayDeque<Work> QUEUE = new ArrayDeque<>();
+    private static final AttachmentType<ArrayDeque<Work>> QUEUE =
+            AttachmentRegistry.create(CursedOath.id("terrain_queue"), builder -> builder.initializer(ArrayDeque::new));
+
+    public static void initialize() {
+        ServerTickEvents.END_SERVER_TICK.register(TerrainDestruction::tick);
+    }
 
     /// A terrain reservation owned by one server level and advanced on its server thread.
     /// Closing cancels queued work and callbacks; [#seal()] instead drains submitted piercing segments.
@@ -65,13 +75,16 @@ public final class TerrainDestruction {
             return positions == null && pending.isEmpty();
         }
 
-        /// Registers a callback for the current cursor's completion; closing cancels it.
+        /// Replaces the current completion callback; explicit cancellation discards it.
         ///
         /// @param action server-thread callback, which may schedule the next cut
         public void onComplete(Runnable action) {
             onComplete = action;
         }
 
+        /// Controls whether an idle reservation stays open for another cut; no work is saved to disk.
+        ///
+        /// @param value whether to retain the reservation after its current cursor completes
         public void persistent(boolean value) {
             persistent = value;
         }
@@ -93,20 +106,23 @@ public final class TerrainDestruction {
         /// Submitted segments survive owner loss and the ordinary reservation timeout.
         ///
         /// @param volume segment to excavate
-        /// @param previous earlier sweep to exclude, or `null` for the first segment
+        /// @param previous previously covered volume to exclude, or `null` for the first segment
+        /// @param clearance launch footprint and footing to preserve
         /// @throws IllegalStateException if this work is closed or its pending queue is full
-        public void pierce(SweptVolume volume, @Nullable SweptVolume previous) {
+        public void pierce(SweptVolume volume, @Nullable SweptVolume previous, AABB clearance) {
             if (finished || pending.size() >= MAX_SEGMENTS)
                 throw new IllegalStateException("Terrain segment capacity exceeded");
             released = true;
             persistent = true;
             pending.addLast(mapPositions(BlockPos.betweenClosed(volume.bounds()).iterator(), pos -> {
                 var box = new AABB(pos);
-                return volume.entry(box) != null && (previous == null || previous.entry(box) == null);
+                return !box.intersects(clearance)
+                        && volume.entry(box) != null
+                        && (previous == null || previous.entry(box) == null);
             }));
         }
 
-        /// Ends piercing submissions, retaining queued segments until they drain.
+        /// Lets submitted segments drain before closing; callers must stop submitting new segments.
         public void seal() {
             persistent = false;
             if (ready()) close();
@@ -125,9 +141,16 @@ public final class TerrainDestruction {
         ///
         /// @param center fixed domain center
         /// @param radius excavation radius in blocks
+        /// @param ground fixed support height; negative infinity for an airborne caster
         /// @throws IllegalStateException if this work is closed or still has queued positions
-        public void domainCuts(Vec3 center, double radius) {
-            sphere(center, radius);
+        public void domainCuts(Vec3 center, double radius, double ground) {
+            requireReady();
+            source = null;
+            int extent = (int) Math.ceil(radius);
+            positions = mapPositions(
+                    BlockPos.withinBoxByManhattanDistance(BlockPos.containing(center), extent, extent, extent)
+                            .iterator(),
+                    pos -> pos.getY() >= ground - 1.0e-6 && new AABB(pos).distanceToSqr(center) < radius * radius);
             released = true;
             persistent = true;
         }
@@ -279,26 +302,32 @@ public final class TerrainDestruction {
         }
     }
 
+    /// Reserves a work slot in the owner's current world. Call on the owning server thread.
+    ///
+    /// @param owner player used for protection checks and ordinary task lifetime
+    /// @return caller-owned reservation, or `null` when the server's capacity is exhausted
     public static @Nullable Work reserve(ServerPlayer owner) {
-        QUEUE.removeIf(Work::finished);
-        if (QUEUE.size() >= MAX_WORK) return null;
+        var queue = owner.level().globalAttachments().getAttachedOrCreate(QUEUE);
+        queue.removeIf(Work::finished);
+        if (queue.size() >= MAX_WORK) return null;
         var work = new Work(owner);
-        QUEUE.addLast(work);
+        queue.addLast(work);
         return work;
     }
 
-    public static void tick() {
-        if (QUEUE.isEmpty()) return;
+    public static void tick(MinecraftServer server) {
+        var queue = server.globalAttachments().getAttached(QUEUE);
+        if (queue == null || queue.isEmpty()) return;
         var event = new TerrainEvent();
         event.begin();
         var budget = new Budget();
         int idle = 0;
-        while (!QUEUE.isEmpty() && budget.available() && idle < QUEUE.size()) {
-            var work = QUEUE.removeFirst();
+        while (!queue.isEmpty() && budget.available() && idle < queue.size()) {
+            var work = queue.removeFirst();
             if (!work.finished()) {
                 idle = work.ready() ? idle + 1 : 0;
                 // Keep the active reservation visible to callbacks that reserve or cancel work.
-                QUEUE.addLast(work);
+                queue.addLast(work);
                 budget.visit(work);
             }
         }
@@ -306,7 +335,7 @@ public final class TerrainDestruction {
         if (event.shouldCommit()) {
             event.visits = budget.candidates;
             event.blocks = budget.writes;
-            event.pending = QUEUE.size();
+            event.pending = queue.size();
             event.commit();
         }
     }
@@ -328,11 +357,6 @@ public final class TerrainDestruction {
                 if (work.ready()) return;
             }
         }
-    }
-
-    public static void clear() {
-        QUEUE.forEach(Work::close);
-        QUEUE.clear();
     }
 
     private record Candidate(BlockPos position, double distance) {}

@@ -27,5 +27,14 @@ public final class TechniqueTuning {
     public static final double CLEAVE_SPACING = 2.0;
     public static final double CLEAVE_THICKNESS = 0.06;
     public static final double CLEAVE_EXTENT = 7.0;
+
+    public static double launchDistance(Technique technique) {
+        return switch (technique) {
+            case PURPLE -> 4.0;
+            case BLUE, RED -> 1.2;
+            default -> 0.0;
+        };
+    }
+
     public static final float FUSION_CONTACT = 0.65f;
 }

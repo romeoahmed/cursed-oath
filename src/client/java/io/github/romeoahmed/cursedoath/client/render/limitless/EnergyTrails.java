@@ -69,18 +69,12 @@ public final class EnergyTrails {
 
     private final PoseStack.Pose pose;
     private final VertexConsumer vertices;
-    private final float opacity;
     private final EffectMesh mesh;
 
     public EnergyTrails(PoseStack.Pose pose, VertexConsumer vertices) {
-        this(pose, vertices, 1);
-    }
-
-    public EnergyTrails(PoseStack.Pose pose, VertexConsumer vertices, float opacity) {
         this.pose = pose;
         this.vertices = vertices;
-        this.opacity = opacity;
-        mesh = new EffectMesh(pose, vertices, opacity, 1, 255);
+        mesh = new EffectMesh(pose, vertices, 1, 1, 255);
     }
 
     public void draw(LimitlessEffects.Form form) {
@@ -108,8 +102,8 @@ public final class EnergyTrails {
                     outer = (band + 1.0) / GLOW_BANDS,
                     innerRadius = form.radius() * GLOW_RADIUS * inner,
                     outerRadius = form.radius() * GLOW_RADIUS * outer;
-            int innerColor = ARGB.color((int) ((1 - inner) * (1 - inner) * opacity * GLOW_ALPHA * strength), color),
-                    outerColor = ARGB.color((int) ((1 - outer) * (1 - outer) * opacity * GLOW_ALPHA * strength), color);
+            int innerColor = ARGB.color((int) ((1 - inner) * (1 - inner) * GLOW_ALPHA * strength), color),
+                    outerColor = ARGB.color((int) ((1 - outer) * (1 - outer) * GLOW_ALPHA * strength), color);
             for (int i = 0; i < GLOW_SEGMENTS; i++) {
                 glowVertex(center, axes, CIRCLE[i], innerRadius, innerColor);
                 glowVertex(center, axes, CIRCLE[i + 1], innerRadius, innerColor);

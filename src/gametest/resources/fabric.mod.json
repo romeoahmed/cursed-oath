@@ -21,10 +21,11 @@
 		],
 		"fabric-client-gametest": [
 			"io.github.romeoahmed.cursedoath.client.CombatClientGameTest",
-			"io.github.romeoahmed.cursedoath.client.RenderClientGameTest",
-			"io.github.romeoahmed.cursedoath.client.PurpleClientGameTest",
+			"io.github.romeoahmed.cursedoath.client.LaunchClientGameTest",
+			"io.github.romeoahmed.cursedoath.client.LimitlessClientGameTest",
 			"io.github.romeoahmed.cursedoath.client.ProjectileClientGameTest",
-			"io.github.romeoahmed.cursedoath.client.DomainClientGameTest"
+			"io.github.romeoahmed.cursedoath.client.DomainClientGameTest",
+			"io.github.romeoahmed.cursedoath.client.RenderClientGameTest"
 		]
 	},
 	"mixins": [

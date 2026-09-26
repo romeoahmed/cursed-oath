@@ -42,6 +42,7 @@ final class DomainEffects {
     private static boolean canHit(DomainEntity domain, LivingEntity target, Collection<DomainEntity> domains) {
         var owner = domain.caster;
         return owner != null
+                && target.level().equals(domain.level())
                 && domain.contains(target.getBoundingBox().getCenter())
                 && TechniqueCombat.canAffect(owner, target)
                 && !(domain.closed() && owner.getBoundingBox().inflate(0.15).intersects(target.getBoundingBox()))
@@ -83,7 +84,8 @@ final class DomainEffects {
             work = TerrainDestruction.reserve(owner);
             domain.terrain = work;
         }
-        if (work != null && work.ready() && !work.finished()) work.domainCuts(domain.position(), domain.radius());
+        if (work != null && work.ready() && !work.finished())
+            work.domainCuts(domain.position(), domain.radius(), domain.ground);
     }
 
     static void erodeShells(DomainEntity shrine, List<DomainEntity> domains) {

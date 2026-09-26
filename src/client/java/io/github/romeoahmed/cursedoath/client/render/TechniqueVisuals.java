@@ -8,6 +8,7 @@ import io.github.romeoahmed.cursedoath.client.render.limitless.LimitlessEffects;
 import io.github.romeoahmed.cursedoath.network.TechniqueEvent;
 import io.github.romeoahmed.cursedoath.technique.Technique;
 import io.github.romeoahmed.cursedoath.technique.TechniqueOrb;
+import io.github.romeoahmed.cursedoath.technique.TechniqueTuning;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -29,7 +30,7 @@ import org.jspecify.annotations.Nullable;
 
 public final class TechniqueVisuals {
     private static final int MAX_DEBRIS_FIELDS = 8, MAX_EFFECTS = 96, MAX_SEEN = 512, IMPACT_DURATION = 16;
-    private static final double HAND_DISTANCE = 1.2, MAX_DISTANCE_SQUARED = 128.0 * 128.0, EFFECT_SIZE = 32;
+    private static final double MAX_DISTANCE_SQUARED = 128.0 * 128.0, EFFECT_SIZE = 32;
 
     private record Effect(TechniqueEvent event, Technique technique, int duration) {}
 
@@ -88,17 +89,23 @@ public final class TechniqueVisuals {
                             collector,
                             LimitlessEffects.charge(shape.technique(), shape.progress(), shape.direction()));
                 else {
-                    collector.submitCustomGeometry(pose, renderType, (matrix, vertices) -> {
-                        switch (shape.stage()) {
-                            case TechniqueEvent.IMPACT -> new EnergyTrails(matrix, vertices).impact(shape.progress());
-                            case TechniqueEvent.BLACK_FLASH ->
-                                new StrikeGeometry(new EffectMesh(matrix, vertices))
-                                        .blackFlash(shape.direction(), shape.progress());
-                            default ->
-                                new TechniqueGeometry(matrix, vertices, 1, 1)
-                                        .draw(shape.technique(), shape.progress(), shape.direction());
-                        }
-                    });
+                    collector.submitCustomGeometry(
+                            pose,
+                            shape.technique() == Technique.CLEAVE && shape.stage() != TechniqueEvent.BLACK_FLASH
+                                    ? EffectRenderTypes.CORE
+                                    : renderType,
+                            (matrix, vertices) -> {
+                                switch (shape.stage()) {
+                                    case TechniqueEvent.IMPACT ->
+                                        new EnergyTrails(matrix, vertices).impact(shape.progress());
+                                    case TechniqueEvent.BLACK_FLASH ->
+                                        new TechniqueGeometry(new EffectMesh(matrix, vertices))
+                                                .blackFlash(shape.direction(), shape.progress());
+                                    default ->
+                                        new TechniqueGeometry(new EffectMesh(matrix, vertices))
+                                                .draw(shape.technique(), shape.progress(), shape.direction());
+                                }
+                            });
                     drawCore(pose, collector, shape);
                 }
                 pose.popPose();
@@ -111,7 +118,7 @@ public final class TechniqueVisuals {
         collector.submitCustomGeometry(
                 pose,
                 EffectRenderTypes.CORE,
-                (matrix, vertices) -> new StrikeGeometry(new EffectMesh(matrix, vertices, 1, 1, 255))
+                (matrix, vertices) -> new TechniqueGeometry(new EffectMesh(matrix, vertices, 1, 1, 255))
                         .blackFlash(shape.direction(), shape.progress(), true));
     }
 
@@ -130,7 +137,10 @@ public final class TechniqueVisuals {
         var direction = actor == null
                 ? effect.event().destination().subtract(effect.event().origin()).normalize()
                 : actor.getViewVector(partial);
-        double distance = effect.technique() == Technique.PURPLE ? LimitlessEffects.CHARGE_DISTANCE : HAND_DISTANCE;
+        double distance = switch (effect.technique()) {
+            case BLUE, RED, PURPLE -> TechniqueTuning.launchDistance(effect.technique());
+            default -> 1.2;
+        };
         var position = actor == null
                 ? effect.event().destination()
                 : actor.getEyePosition(partial).add(direction.scale(distance));

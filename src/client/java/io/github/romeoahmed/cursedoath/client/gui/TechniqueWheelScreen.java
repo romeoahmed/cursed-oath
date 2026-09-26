@@ -209,14 +209,7 @@ public final class TechniqueWheelScreen extends Screen {
             return true;
         }
         if (CombatInput.CAST.matches(event)) {
-            var choice = preview;
-            if (!pointerSelection)
-                for (var entry : choices.entrySet())
-                    if (entry.getKey().isFocused()) {
-                        choice = entry.getValue();
-                        break;
-                    }
-            select(choice, true);
+            select(pointerSelection ? preview : focusedChoice(), true);
             return true;
         }
         pointerSelection = false;

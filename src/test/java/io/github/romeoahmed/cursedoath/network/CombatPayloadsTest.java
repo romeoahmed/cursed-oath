@@ -59,6 +59,10 @@ class CombatPayloadsTest {
         var buffer = Unpooled.buffer();
         try {
             codec.encode(buffer, value);
+            int boundary = buffer.writerIndex();
+            codec.encode(buffer, value);
+            assertEquals(value, codec.decode(buffer));
+            assertEquals(boundary, buffer.readerIndex(), "Decoding must stop at the next payload boundary");
             assertEquals(value, codec.decode(buffer));
             assertFalse(buffer.isReadable(), "A decoder must consume exactly one encoded payload");
         } finally {

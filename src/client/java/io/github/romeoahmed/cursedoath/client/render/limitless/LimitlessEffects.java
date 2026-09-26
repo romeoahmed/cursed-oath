@@ -12,7 +12,6 @@ import net.minecraft.world.phys.Vec3;
 
 /// Immutable forms are shared by the depth-writing body and additive flow passes.
 public final class LimitlessEffects {
-    public static final double CHARGE_DISTANCE = 4.0;
     public static final double VISUAL_RADIUS = 16.0;
     private static final double BLUE_RADIUS = 1.4;
     private static final double BLUE_CHARGE = 0.6;
@@ -21,7 +20,8 @@ public final class LimitlessEffects {
     private static final double MERGED_RADIUS = 0.65;
     private static final double RELEASE_RADIUS = 1.6;
     private static final float MERGE_DURATION = 0.12f;
-    private static final float RELEASE_TICKS = 4f;
+    private static final double BLUE_GROWTH_DISTANCE = 4;
+    private static final double PURPLE_GROWTH_DISTANCE = TechniqueTuning.PURPLE_SPEED * 4;
     private static final double SEPARATION = 2.2;
     private static final double CHARGE_START = 0.4;
     private static final double CHARGE_GROWTH = 0.6;
@@ -64,39 +64,35 @@ public final class LimitlessEffects {
                 age));
     }
 
-    public static List<Form> flight(Technique technique, float age, Vec3 direction) {
+    public static List<Form> flight(Technique technique, float age, Vec3 direction, double traveled) {
         double radius;
         switch (technique) {
-            case BLUE ->
-                radius = BLUE_RADIUS * Math.clamp((1 - age / TechniqueTuning.BLUE_DURATION) * FADE_SPEED, 0f, 1f);
+            case BLUE -> {
+                radius = BLUE_CHARGE + (BLUE_RADIUS - BLUE_CHARGE) * smooth((float) (traveled / BLUE_GROWTH_DISTANCE));
+                radius *= Math.clamp((1 - age / TechniqueTuning.BLUE_DURATION) * FADE_SPEED, 0f, 1f);
+            }
             case RED -> radius = RED_RADIUS;
             case PURPLE ->
-                radius =
-                        RELEASE_RADIUS + (TechniqueTuning.PURPLE_RADIUS - RELEASE_RADIUS) * smooth(age / RELEASE_TICKS);
+                radius = RELEASE_RADIUS
+                        + (TechniqueTuning.PURPLE_RADIUS - RELEASE_RADIUS)
+                                * smooth((float) (traveled / PURPLE_GROWTH_DISTANCE));
             default -> {
                 return List.of();
             }
         }
-        var center = technique == Technique.PURPLE
-                ? direction.scale(CHARGE_DISTANCE * (1 - smooth(age / RELEASE_TICKS)))
-                : Vec3.ZERO;
-        // Purple retains its surface phase across the preparation/projectile handoff.
-        float visualAge = technique == Technique.PURPLE ? age + technique.preparation() : age;
-        return List.of(new Form(technique, center, direction, radius, visualAge, true, 0));
+        // Movement interpolation can lag behind age; only traveled distance may expand the body.
+        float visualAge = age + technique.preparation();
+        return List.of(new Form(technique, Vec3.ZERO, direction, radius, visualAge, true, 0));
     }
 
     public static void submit(PoseStack pose, SubmitNodeCollector collector, List<Form> forms) {
-        submit(pose, collector, forms, 1);
-    }
-
-    public static void submit(PoseStack pose, SubmitNodeCollector collector, List<Form> forms, float opacity) {
         if (forms.isEmpty()) return;
         collector.submitCustomGeometry(pose, EffectRenderTypes.SOLID, (matrix, vertices) -> {
             var surface = new EnergySurface(matrix, vertices);
             for (var form : forms) surface.draw(form);
         });
         collector.submitCustomGeometry(pose, EffectRenderTypes.ADDITIVE, (matrix, vertices) -> {
-            var trails = new EnergyTrails(matrix, vertices, opacity);
+            var trails = new EnergyTrails(matrix, vertices);
             for (var form : forms) trails.draw(form);
         });
     }

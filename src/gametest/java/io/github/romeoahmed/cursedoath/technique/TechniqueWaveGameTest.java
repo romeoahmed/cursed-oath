@@ -26,8 +26,29 @@ public final class TechniqueWaveGameTest {
             DENSE_MAX = new BlockPos(20, 16, 24),
             TARGET = new BlockPos(14, 10, 21);
     private static final Vec3 ORIGIN = new Vec3(14.5, 10.0, 9.5);
-    private static final int FLIGHT_TICKS = 3, SETTLE_TICKS = 20;
+    private static final int FLIGHT_TICKS = 3;
     private static final float HEALTH = 500;
+
+    @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:arena", maxTicks = 100)
+    public void purpleLeavesItsCasterAndLaunchFootingIntact(GameTestHelper helper) {
+        var player = caster(helper);
+        player.setPos(helper.absoluteVec(ORIGIN));
+        player.setNoGravity(true);
+        helper.getLevel().addNewPlayer(player);
+        var footing = new BlockPos(14, 9, 9);
+        var forward = new BlockPos(14, 9, 15);
+        helper.setBlock(footing, Blocks.STONE);
+        helper.setBlock(forward, Blocks.STONE);
+        var wave = launchWave(helper, player, Technique.PURPLE);
+        helper.assertTrue(
+                wave.position().subtract(player.getEyePosition()).dot(player.getLookAngle()) > 0,
+                "The projectile starts at the forward casting position");
+        helper.succeedWhen(() -> {
+            helper.assertBlockPresent(Blocks.AIR, forward);
+            helper.assertBlockPresent(Blocks.STONE, footing);
+            helper.assertTrue(player.getHealth() == player.getMaxHealth(), "Purple cannot hit its caster");
+        });
+    }
 
     @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:arena")
     public void purpleKeepsShellCollisionsInItsFlightLevelAfterCasterTransfer(GameTestHelper helper) {
@@ -50,7 +71,7 @@ public final class TechniqueWaveGameTest {
         helper.succeed();
     }
 
-    @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:arena", maxTicks = 100)
+    @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:flight", maxTicks = 100)
     public void purplePiercesWallsAndHitsEachTargetOnce(GameTestHelper helper) {
         var player = caster(helper);
         player.setPos(helper.absoluteVec(ORIGIN));
@@ -59,22 +80,22 @@ public final class TechniqueWaveGameTest {
         target.setHealth(HEALTH);
         var wall = new BlockPos(14, 11, 18);
         helper.setBlock(wall, Blocks.STONE);
-        var wave = launchWave(helper, player, Technique.PURPLE);
+        var work = requireNonNull(release(helper, player, Technique.PURPLE));
         helper.assertTrue(target.getHealth() == HEALTH, "Release must not cause instant ray damage");
         helper.startSequence()
                 .thenWaitUntil(() -> helper.assertTrue(
                         target.getHealth() < HEALTH, "Purple must reach the target independently of excavation"))
-                .thenExecuteAfter(SETTLE_TICKS, () -> {
+                .thenWaitUntil(() -> helper.assertTrue(work.finished(), "Flight and excavation must finish"))
+                .thenExecute(() -> {
                     helper.assertTrue(
                             target.getHealth() == HEALTH - TechniqueTuning.PURPLE_DAMAGE,
-                            "An overlapping target must not be damaged twice");
+                            "The completed flight must damage the target exactly once; health=" + target.getHealth());
                     helper.assertBlockPresent(Blocks.AIR, wall);
-                    wave.discard();
                 })
                 .thenSucceed();
     }
 
-    @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:arena", maxTicks = 100)
+    @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:flight", maxTicks = 100)
     public void bedrockIsPreservedWithoutShieldingTargets(GameTestHelper helper) {
         var player = caster(helper);
         player.setPos(helper.absoluteVec(ORIGIN));
@@ -82,25 +103,30 @@ public final class TechniqueWaveGameTest {
         helper.setBlock(wall, Blocks.BEDROCK);
         var target = stationaryTarget(helper, EntityTypes.HUSK, TARGET);
         var before = target.getHealth();
-        var wave = launchWave(helper, player, Technique.PURPLE);
+        var work = requireNonNull(release(helper, player, Technique.PURPLE));
         helper.succeedWhen(() -> {
-            helper.assertTrue(wave.getZ() > helper.absolutePos(wall).getZ(), "Purple must pass the protected surface");
+            helper.assertTrue(work.finished(), "Flight and queued excavation must finish before checking preservation");
             helper.assertBlockPresent(Blocks.BEDROCK, wall);
             helper.assertTrue(target.getHealth() < before, "A preserved block must not shield entities");
         });
     }
 
-    @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:arena", maxTicks = 100)
-    public void containersRemainWithoutStoppingPurple(GameTestHelper helper) {
+    @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:flight", maxTicks = 100)
+    public void containersAndFluidsSurviveCompletedPurpleExcavation(GameTestHelper helper) {
         var player = caster(helper);
         player.setPos(helper.absoluteVec(ORIGIN));
         var chest = new BlockPos(14, 11, 18);
+        var fluid = chest.east();
+        var behind = chest.above().south(2);
         helper.setBlock(chest, Blocks.CHEST);
-        helper.setBlock(chest.south(), Blocks.WATER);
-        var wave = launchWave(helper, player, Technique.PURPLE);
+        helper.setBlock(fluid, Blocks.WATER);
+        helper.setBlock(behind, Blocks.STONE);
+        var work = requireNonNull(release(helper, player, Technique.PURPLE));
         helper.succeedWhen(() -> {
-            helper.assertTrue(wave.getZ() > helper.absolutePos(chest).getZ(), "Purple must pass a container");
+            helper.assertTrue(work.finished(), "The entire flight and its queued excavation must finish");
             helper.assertBlockPresent(Blocks.CHEST, chest);
+            helper.assertBlockPresent(Blocks.WATER, fluid);
+            helper.assertBlockPresent(Blocks.AIR, behind);
         });
     }
 

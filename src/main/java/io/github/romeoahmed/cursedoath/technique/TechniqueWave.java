@@ -68,7 +68,6 @@ public final class TechniqueWave extends TechniqueProjectile {
         else tickSlash();
     }
 
-    @SuppressWarnings("ReferenceEquality") // Ownership follows live instances, not entity IDs.
     private void tickSlash() {
         if (!(level() instanceof ServerLevel level)) return;
         var work = excavation;
@@ -77,12 +76,7 @@ public final class TechniqueWave extends TechniqueProjectile {
             return;
         }
         var player = work.owner();
-        if (!player.isAlive()
-                || player.isRemoved()
-                || player.isSpectator()
-                || work.finished()
-                || player.level() != level
-                || tickCount >= MAX_AGE) {
+        if (!TechniqueCombat.isActive(player, level) || work.finished() || tickCount >= MAX_AGE) {
             discard();
             return;
         }
@@ -100,7 +94,10 @@ public final class TechniqueWave extends TechniqueProjectile {
         var destination = next;
         if (destination != null) {
             damage(level, player, new SweptVolume(position(), destination, SIZE));
-            if (isRemoved()) return;
+            if (isRemoved() || !TechniqueCombat.isActive(player, level)) {
+                discard();
+                return;
+            }
             var obstruction = level.clipIncludingBorder(
                     new ClipContext(position(), destination, ClipContext.Block.COLLIDER, ClipContext.Fluid.ANY, this));
             if (obstruction.getType() != HitResult.Type.MISS) {
@@ -140,6 +137,8 @@ public final class TechniqueWave extends TechniqueProjectile {
         // Broad phase includes ordinary target movement; narrow phase uses a relative segment.
         for (var target :
                 level.getEntitiesOfClass(LivingEntity.class, volume.bounds().inflate(MOVEMENT_MARGIN))) {
+            if (!TechniqueCombat.isActive(player, level)) return;
+            if (!target.level().equals(level)) continue;
             hitTarget(player, target, volume);
             // Damage callbacks can remove this wave and close its terrain reservation.
             if (isRemoved()) return;

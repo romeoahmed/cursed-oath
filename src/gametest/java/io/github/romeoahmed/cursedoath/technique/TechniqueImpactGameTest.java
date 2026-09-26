@@ -20,13 +20,29 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class TechniqueImpactGameTest {
     @GameTest(environment = "cursed-oath-test:power", structure = "cursed-oath-test:arena")
+    public void cleaveOwnerRemovalDuringContactDoesNotScheduleALattice(GameTestHelper helper) {
+        var player = caster(helper);
+        player.setPos(helper.absoluteVec(ORIGIN));
+        var target = durableTarget(helper, new BlockPos(14, 10, 11));
+        var work = requireNonNull(reserveTerrain(helper, player));
+        allowDamage(helper, List.of(target), (entity, source, amount) -> {
+            player.discard();
+            return true;
+        });
+        var contact = CleaveContact.release(player, work);
+        helper.assertTrue(target.getHealth() < HEALTH, "Initial contact must reach the callback");
+        helper.assertTrue(contact == null && work.finished(), "Owner removal must release deferred cutting capacity");
+        helper.succeed();
+    }
+
+    @GameTest(environment = "cursed-oath-test:power", structure = "cursed-oath-test:arena")
     public void cleaveCancellationDuringContactDoesNotScheduleALattice(GameTestHelper helper) {
         var player = caster(helper);
         player.setPos(helper.absoluteVec(ORIGIN));
         var target = durableTarget(helper, new BlockPos(14, 10, 11));
         var work = requireNonNull(reserveTerrain(helper, player));
-        allowDamage(helper, (entity, source, amount) -> {
-            if (entity.equals(target)) work.close();
+        allowDamage(helper, List.of(target), (entity, source, amount) -> {
+            work.close();
             return true;
         });
         var contact = CleaveContact.release(player, work);
@@ -43,13 +59,16 @@ public final class TechniqueImpactGameTest {
         var target = stationaryTarget(helper, EntityTypes.HUSK, new BlockPos(2, 1, 6));
         target.setPos(domain.position().add(0.0, domain.radius() - 2, 0.0));
         var impact = domain.position().add(0.0, domain.radius() + 1, 0.0);
+        var orb = launchOrb(helper, attacker, Technique.BLUE);
+        orb.setPos(impact);
+        orb.tickCount = 1;
         var health = target.getHealth();
-        BlueField.tick(attacker, impact, 1);
+        BlueField.tick(attacker, orb);
         RedBlast.impact(attacker, impact, new Vec3(0.0, -1.0, 0.0));
         helper.assertTrue(target.getHealth() == health, "The shell must stop secondary damage");
         helper.assertTrue(target.getDeltaMovement().equals(Vec3.ZERO), "The shell must stop secondary forces");
         Domains.end(domain);
-        BlueField.tick(attacker, impact, 1);
+        BlueField.tick(attacker, orb);
         helper.assertTrue(target.getDeltaMovement().y > 0, "The same field reaches its target after collapse");
         helper.succeed();
     }
@@ -199,8 +218,8 @@ public final class TechniqueImpactGameTest {
                 stationaryTarget(helper, EntityTypes.VILLAGER, TARGET),
                 stationaryTarget(helper, EntityTypes.VILLAGER, TARGET));
         var wave = launchWave(helper, player, technique);
-        allowDamage(helper, (target, source, amount) -> {
-            if (targets.contains(target)) wave.discard();
+        allowDamage(helper, targets, (target, source, amount) -> {
+            wave.discard();
             return true;
         });
         helper.succeedWhen(() -> {

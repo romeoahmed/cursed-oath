@@ -1,6 +1,6 @@
 # Cursed Oath · 咒誓
 
-A **Minecraft 26.3 Fabric combat mod** inspired by _Jujutsu Kaisen_, with destructive techniques and domain battles in Minecraft's block-based world.
+A **Minecraft 26.3 Fabric combat mod** inspired by _Jujutsu Kaisen_, featuring destructive techniques, reinforced melee, and domain battles.
 
 **Development prototype:** abilities are available through practice commands; survival progression is not implemented. Supports English, Simplified Chinese, and Japanese.
 
@@ -15,7 +15,7 @@ _AI-generated art reference, not an in-game screenshot. Character details and li
 - **Unlimited Void:** a breakable closed barrier and information overload that immobilizes and deals lethal damage to unprotected ordinary targets.
 - **Shared abilities:** reinforced melee with a chance of Black Flash, self-healing, Simple Domain, and Domain Amplification.
 
-Overlapping domains suppress sure hits in their shared area. Unlimited Void hides the terrain behind a panorama while retaining the original world's blocks and collisions. See [scope and limitations](docs/design.zh-CN.md#当前交付边界).
+Domains occupy the existing world; overlapping areas suppress sure hits. Unlimited Void hides terrain visually but retains its collisions. See [scope and limitations](docs/design.zh-CN.md#当前交付边界).
 
 **Use a disposable world: terrain destruction is permanent.** Blocks with block entities, fluid-containing blocks, unbreakable blocks, and blocks denied by protection checks are preserved. They do not shield targets from Purple. Protection-mod compatibility needs separate verification.
 
@@ -33,13 +33,13 @@ Use `gradlew.bat` on Windows. The wrapper resolves development dependencies. In 
 /cursedoath practice
 ```
 
-This unlocks all prototype abilities and resets resources and the Shrine radius. These player commands require operator permissions:
+Commands require a player with operator permissions:
 
-| Command                       | Effect                                                |
-| ----------------------------- | ----------------------------------------------------- |
-| `/cursedoath practice`        | Unlock abilities and reset practice state             |
-| `/cursedoath clear`           | Disable practice access                               |
-| `/cursedoath radius <blocks>` | Set the next Shrine radius: 16–200 blocks, default 96 |
+| Command                       | Effect                                                        |
+| ----------------------------- | ------------------------------------------------------------- |
+| `/cursedoath practice`        | Unlock abilities; reset energy, recovery, burnout, and radius |
+| `/cursedoath clear`           | Revoke abilities; end preparation, defenses, and your domain  |
+| `/cursedoath radius <blocks>` | Set the next Shrine radius: 16–200 blocks, default 96         |
 
 ## Controls
 
@@ -53,7 +53,7 @@ This unlocks all prototype abilities and resets resources and the Shrine radius.
 
 The wheel keeps the world running. Point or use Tab to preview; left-click or Enter selects, while right-click or the cast key uses the technique. Selection closes the wheel; Escape closes it without changing the selection. Keys can be rebound in Minecraft Options.
 
-After G, attack within three seconds with over 90% attack strength for a 20% Black Flash chance; an attack or empty swing consumes readiness. X does not recall released projectiles. “Hide Lightning Flashes” reduces Shrine's decorative slashes. Domain sounds have localized subtitles. See the [combat guide](docs/combat.zh-CN.md) for costs, damage, defenses, and burnout.
+After G, attack within three seconds with over 90% attack strength for a 20% Black Flash chance; an attack or empty swing consumes readiness. X does not recall released projectiles. “Hide Lightning Flashes” reduces Shrine slashes, Void's opening flash, and domain-clash brightness. Domain sounds have localized subtitles. See the [combat guide](docs/combat.zh-CN.md) for costs, damage, defenses, and burnout.
 
 ## Build and install
 
@@ -65,9 +65,7 @@ Install the runtime JAR from `build/libs/` on client and server with **Fabric Lo
 
 ## Contribute
 
-Follow [Repository Guidelines](AGENTS.md) for layout, formatting, and verification. Reports are in `build/reports/`; client captures are in `build/run/clientGameTest/screenshots/`. Model changes also require the [export checks](art/shrine/README.md#export-and-verify).
-
-Bug reports should include reproduction steps, expected behavior, and relevant logs. PRs should explain changes and checks performed, with screenshots for visible changes. Device compatibility, visual quality, and multiplayer load need separate verification.
+Bug reports, code, translations, documentation, and art contributions are welcome. See the [contribution guide](CONTRIBUTING.md) for setup, checks, and submitting issues or pull requests.
 
 ## Documentation
 

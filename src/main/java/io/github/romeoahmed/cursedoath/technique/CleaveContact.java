@@ -20,6 +20,7 @@ public final class CleaveContact {
 
     @SuppressWarnings("ReferenceEquality") // Ownership follows live instances, not entity IDs.
     public static @Nullable Vec3 release(ServerPlayer player, TerrainDestruction.Work work) {
+        var level = player.level();
         var hit = TechniqueCombat.contact(player, RANGE);
         var boundary = DomainInteractions.contact(
                 player,
@@ -50,12 +51,18 @@ public final class CleaveContact {
             return null;
         }
         if (target != null) damage(player, target);
-        if (work.finished()) return null;
+        if (work.finished() || !TechniqueCombat.isActive(player, level)) {
+            work.close();
+            return null;
+        }
         work.cuts(lattice.cuts(), hit.getLocation());
         work.onComplete(() -> {
-            if (LoadedChunks.contains(player.level(), lattice.bounds()))
-                for (var neighbor : player.level().getEntitiesOfClass(LivingEntity.class, lattice.bounds()))
-                    if (neighbor != target && exposed(player, lattice, neighbor)) damage(player, neighbor);
+            if (!LoadedChunks.contains(level, lattice.bounds())) return;
+            for (var neighbor : level.getEntitiesOfClass(LivingEntity.class, lattice.bounds())) {
+                if (!TechniqueCombat.isActive(player, level)) return;
+                if (neighbor != target && neighbor.level().equals(level) && exposed(player, lattice, neighbor))
+                    damage(player, neighbor);
+            }
         });
         return hit.getLocation();
     }

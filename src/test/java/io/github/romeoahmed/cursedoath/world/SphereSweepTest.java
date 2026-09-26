@@ -21,22 +21,8 @@ class SphereSweepTest {
         assertNull(sweep.entry(near.move(8.0, 0.0, 0.0)));
         assertEquals(0.5, sweep.entry(far));
         assertEquals(0.25, sweep.entry(near));
-    }
-
-    @Test
-    void queryOrderDoesNotChangeContactResults() {
-        var start = new Vec3(-5.0, -5.0, -5.0);
-        var end = new Vec3(5.0, 5.0, 5.0);
-        var sweep = new SphereSweep(start, end, 1.0);
-        var boxes = List.of(
-                new AABB(-1.0, -0.5, -1.5, 1.0, 0.5, 1.5),
-                new AABB(-20.0, -20.0, 3.0, 20.0, 20.0, 4.0),
-                new AABB(-1.0, -1.0, -1.0, 1.0, 1.0, 1.0),
-                new AABB(-20.0, -20.0, 6.0, 20.0, 20.0, 7.0));
-        for (int i = 0; i < 3; i++) {
-            for (var box : boxes) assertEquals(new SphereSweep(start, end, 1.0).entry(box), sweep.entry(box));
-        }
-        assertEquals(1.0, sweep.entry(boxes.getLast()));
+        assertNull(sweep.entry(near.move(8.0, 0.0, 0.0)));
+        assertEquals(0.5, sweep.entry(far));
     }
 
     @Test

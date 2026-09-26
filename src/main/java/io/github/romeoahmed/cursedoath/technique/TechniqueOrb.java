@@ -30,6 +30,7 @@ public final class TechniqueOrb extends TechniqueProjectile {
     private TerrainDestruction.@Nullable Work excavation;
     private double remaining;
     private boolean settled;
+    private @Nullable Vec3 launchOrigin;
 
     public TechniqueOrb(EntityType<? extends TechniqueOrb> type, Level level) {
         super(type, level);
@@ -37,6 +38,7 @@ public final class TechniqueOrb extends TechniqueProjectile {
 
     public void configure(ServerPlayer player, Technique ability, TerrainDestruction.Work work) {
         launch(player, ability);
+        launchOrigin = player.getEyePosition();
         excavation = work;
         remaining = ability == Technique.BLUE ? BLUE_RANGE : RED_RANGE;
         setDeltaMovement(player.getLookAngle().scale(ability == Technique.BLUE ? BLUE_SPEED : RED_SPEED));
@@ -48,7 +50,6 @@ public final class TechniqueOrb extends TechniqueProjectile {
         super.onRemoval(reason);
     }
 
-    @SuppressWarnings("ReferenceEquality") // Ownership follows live instances, not entity IDs.
     @Override
     public void tick() {
         super.tick();
@@ -59,11 +60,7 @@ public final class TechniqueOrb extends TechniqueProjectile {
             return;
         }
         var player = work.owner();
-        if (!player.isAlive()
-                || player.isRemoved()
-                || player.isSpectator()
-                || player.level() != level
-                || tickCount > TechniqueTuning.BLUE_DURATION) {
+        if (!TechniqueCombat.isActive(player, level) || tickCount > TechniqueTuning.BLUE_DURATION) {
             discard();
             return;
         }
@@ -72,44 +69,46 @@ public final class TechniqueOrb extends TechniqueProjectile {
             return;
         }
         if (!settled) travel(level, player, work);
-        if (!isRemoved() && technique() == Technique.BLUE) BlueField.tick(player, position(), tickCount);
+        if (!isRemoved() && technique() == Technique.BLUE) BlueField.tick(player, this);
     }
 
     private void travel(ServerLevel level, ServerPlayer player, TerrainDestruction.Work work) {
+        var start = launchOrigin == null ? position() : launchOrigin;
+        launchOrigin = null;
         var movement = getDeltaMovement();
         double distance = Math.min(movement.length(), remaining);
         var direction = movement.normalize();
         var end = position().add(direction.scale(distance));
         if (!level.isPositionEntityTicking(BlockPos.containing(end))
-                || !LoadedChunks.contains(level, new AABB(position(), end).inflate(AIM_MARGIN))) {
+                || !LoadedChunks.contains(level, new AABB(start, end).inflate(AIM_MARGIN))) {
             discard();
             return;
         }
         var block = level.clipIncludingBorder(
-                new ClipContext(position(), end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
+                new ClipContext(start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
         HitResult hit = block;
         double nearest = Double.POSITIVE_INFINITY;
         for (var candidate : ProjectileUtil.getManyEntityHitResult(
                 level,
                 this,
-                position(),
+                start,
                 block.getLocation(),
-                new AABB(position(), block.getLocation()).inflate(AIM_MARGIN),
+                new AABB(start, block.getLocation()).inflate(AIM_MARGIN),
                 entity -> entity instanceof LivingEntity living && TechniqueCombat.canAffect(player, living),
                 AIM_MARGIN,
                 ClipContext.Block.COLLIDER,
                 true,
                 true)) {
-            double separation = candidate.getLocation().distanceToSqr(position());
+            double separation = candidate.getLocation().distanceToSqr(start);
             if (separation < nearest) {
                 hit = candidate;
                 nearest = separation;
             }
         }
-        var barrier = DomainInteractions.contact(player, position(), hit.getLocation());
+        var barrier = DomainInteractions.contact(player, start, hit.getLocation());
         if (barrier != null) {
             float power = technique() == Technique.BLUE ? TechniqueTuning.BLUE_OUTPUT : TechniqueTuning.RED_DAMAGE;
-            barrier.domain().damageShell(power, !barrier.domain().contains(position()));
+            barrier.domain().damageShell(power, !barrier.domain().contains(start));
             setPos(barrier.point().subtract(direction.scale(SURFACE_OFFSET)));
             impact(player, work, direction);
             return;

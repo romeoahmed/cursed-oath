@@ -19,6 +19,17 @@ class CursedEnergyTest {
     }
 
     @Test
+    void exactBudgetCanBeReservedAndSettledWithoutOverdraft() {
+        var prepared = new CursedEnergy(100).prepare(10, 90);
+        assertNotNull(prepared);
+        assertEquals(0, prepared.available());
+        assertNull(prepared.spend(1));
+        assertEquals(prepared, prepared.spend(0));
+        assertEquals(new CursedEnergy(0), prepared.release(90));
+        assertEquals(new CursedEnergy(90), prepared.cancel(90));
+    }
+
+    @Test
     void cancellationReleasesReservationWithoutRefundingStartup() {
         var prepared = new CursedEnergy(100).prepare(10, 70);
         assertNotNull(prepared);

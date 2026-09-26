@@ -3,7 +3,7 @@ import net.ltgt.gradle.errorprone.errorprone
 
 plugins {
     id("net.fabricmc.fabric-loom")
-    id("com.diffplug.spotless") version "8.10.2"
+    id("com.diffplug.spotless") version "8.10.3"
     id("net.ltgt.errorprone") version "5.1.1"
     jacoco
 }
@@ -59,6 +59,10 @@ tasks.test {
     useJUnitPlatform()
 }
 
+tasks.named("runGameTest") {
+    mustRunAfter(tasks.test)
+}
+
 tasks.processResources {
     val metadata =
         listOf("version", "loader_version", "fabric_api_version")
@@ -93,7 +97,6 @@ spotless {
             "docs/*.md",
             "art/**/*.md",
             "art/**/*.py",
-            "src/**/*.fsh",
             ".editorconfig",
             "gradle.properties",
             ".github/**/*.yml",

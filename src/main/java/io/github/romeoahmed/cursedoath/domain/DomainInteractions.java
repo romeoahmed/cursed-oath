@@ -41,7 +41,7 @@ public final class DomainInteractions {
     private static InteractionResult blocked(Entity entity) {
         return Domains.isOverloaded(entity) ? InteractionResult.FAIL : InteractionResult.PASS;
     }
-    /// Clips movement against closed shells on both client and server; overload prevents all movement.
+    /// Clips requested movement against closed shells on both sides; overload returns zero displacement.
     ///
     /// @param entity moving entity, used to check overload and barrier exemptions
     /// @param requested displacement before barrier clipping
@@ -52,9 +52,11 @@ public final class DomainInteractions {
                 || entity.isSpectator()
                 || requested.lengthSqr() == 0
                 || (entity instanceof Player player && player.isCreative())) return requested;
+        var domains = DomainIndex.inLevel(entity.level());
+        if (domains.isEmpty()) return requested;
         var result = requested;
         var start = entity.getBoundingBox().getCenter();
-        for (var domain : DomainIndex.inLevel(entity.level())) {
+        for (var domain : domains) {
             if (domain.isRemoved() || !domain.closed() || exempt(entity, domain)) continue;
             var crossing = DomainBoundary.crossing(start, start.add(result), domain.position(), domain.radius());
             if (crossing != null) result = result.scale(Math.max(0, crossing - CONTACT_MARGIN / result.length()));
@@ -70,7 +72,8 @@ public final class DomainInteractions {
     }
 
     public static boolean projectile(Projectile projectile) {
-        if (projectile.level().isClientSide()) return false;
+        if (projectile.level().isClientSide()
+                || DomainIndex.inLevel(projectile.level()).isEmpty()) return false;
         var motion = projectile.getDeltaMovement();
         var start = projectile.position();
         var owner = projectile.getOwner();

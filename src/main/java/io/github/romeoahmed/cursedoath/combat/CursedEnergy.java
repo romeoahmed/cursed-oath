@@ -2,7 +2,10 @@ package io.github.romeoahmed.cursedoath.combat;
 
 import org.jspecify.annotations.Nullable;
 
-/// Integer units keep server-side energy reservations exact.
+/// Immutable energy balance; reserved units remain in the balance but cannot be spent twice.
+///
+/// @param current balance, including reservations, between zero and [#CAPACITY]
+/// @param reserved committed release costs, between zero and `current`
 public record CursedEnergy(int current, int reserved) {
     public static final int CAPACITY = 1000;
 
@@ -23,6 +26,12 @@ public record CursedEnergy(int current, int reserved) {
         return current - reserved;
     }
 
+    /// Pays the startup cost and reserves the release cost atomically.
+    ///
+    /// @param startup nonnegative cost paid immediately
+    /// @param release nonnegative cost held until release or cancellation
+    /// @return updated balance, or `null` if available energy cannot cover both costs
+    /// @throws IllegalArgumentException if either cost is negative
     public @Nullable CursedEnergy prepare(int startup, int release) {
         requireNonnegative(startup);
         requireNonnegative(release);
@@ -34,6 +43,11 @@ public record CursedEnergy(int current, int reserved) {
         return new CursedEnergy(current - cost, reserved - cost);
     }
 
+    /// Frees a release reservation without refunding the startup cost.
+    ///
+    /// @param cost reserved amount to free
+    /// @return balance with that reservation removed
+    /// @throws IllegalArgumentException if the cost is negative or exceeds the reservation
     public CursedEnergy cancel(int cost) {
         requireReserved(cost);
         return new CursedEnergy(current, reserved - cost);

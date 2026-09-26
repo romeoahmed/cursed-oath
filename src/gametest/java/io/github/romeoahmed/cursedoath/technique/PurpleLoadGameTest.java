@@ -23,7 +23,7 @@ public final class PurpleLoadGameTest {
     private static final double START_Z = 9.5;
     private static final float HEALTH = 500;
 
-    @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:arena", maxTicks = 300)
+    @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:flight", maxTicks = 300)
     public void concurrentFlightsDrainTheirTerrainAfterRemoval(GameTestHelper helper) {
         BlockPos.betweenClosed(WALL_MIN, WALL_MAX).forEach(pos -> helper.setBlock(pos, Blocks.STONE));
         var targets = new ArrayList<Villager>();
@@ -38,9 +38,7 @@ public final class PurpleLoadGameTest {
         for (int column = 0; column < COLUMNS; column++) {
             var player = caster(helper);
             player.setPos(helper.absoluteVec(new Vec3(FIRST_X + column * SPACING + 0.5, HEIGHT, START_Z)));
-            var reservation = requireNonNull(reserveTerrain(helper, player));
-            work.add(reservation);
-            TechniqueProjectiles.release(player, Technique.PURPLE, reservation);
+            work.add(requireNonNull(release(helper, player, Technique.PURPLE)));
         }
         helper.succeedWhen(() -> {
             helper.assertTrue(

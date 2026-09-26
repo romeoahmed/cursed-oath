@@ -2,6 +2,7 @@ package io.github.romeoahmed.cursedoath.client.render.domain;
 
 import io.github.romeoahmed.cursedoath.client.render.EffectMesh;
 import it.unimi.dsi.fastutil.HashCommon;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.Vec3;
 
@@ -19,8 +20,8 @@ final class ShrineSlashes {
     private static final double CLEAR = 7.0;
     private static final double FAR = 32.0;
     private static final double FADE = 8.0;
-    private static final double WIDTH = 0.035;
-    private static final int COLOR = 0xE6D7CF;
+    private static final double WIDTH = 0.13;
+    private static final int COLOR = 0x10090C;
     private static final int ACCENT_EVERY = 7;
     private static final double ACCENT_LENGTH = 9.0;
     private static final double LENGTH = 5.0;
@@ -32,13 +33,21 @@ final class ShrineSlashes {
     private final float age;
     private final Vec3 eye;
     private final boolean subdued;
+    private final List<DomainClash.Neighbor> neighbors;
 
-    ShrineSlashes(EffectMesh mesh, double radius, float age, Vec3 eye, boolean subdued) {
+    ShrineSlashes(
+            EffectMesh mesh,
+            double radius,
+            float age,
+            Vec3 eye,
+            boolean subdued,
+            List<DomainClash.Neighbor> neighbors) {
         this.mesh = mesh;
         this.radius = radius;
         this.age = age;
         this.eye = eye;
         this.subdued = subdued;
+        this.neighbors = neighbors;
     }
 
     void draw() {
@@ -55,21 +64,25 @@ final class ShrineSlashes {
         float offset = (float) ((seed >>> 16) % 1000) / 1000 * PERIOD, clock = age + offset;
         if (clock % PERIOD >= LIFETIME) return;
         int beat = (int) Math.floor(clock / PERIOD);
-        double phase = (double) (seed & 0xFFFF) / 65536 * TURN + beat * PHASE_STEP;
         double length = (seed + beat) % ACCENT_EVERY == 0 ? ACCENT_LENGTH : LENGTH;
         var center = new Vec3(
                 (x + offset(seed >>> 24)) * CELL, (y + offset(seed >>> 32)) * CELL, (z + offset(seed >>> 40)) * CELL);
-        if (eye.distanceToSqr(center) >= FAR * FAR || center.length() + length > radius) return;
+        double inset = radius - length;
+        if (inset <= 0 || eye.distanceToSqr(center) >= FAR * FAR || center.lengthSqr() > inset * inset) return;
+        double phase = (double) (seed & 0xFFFF) / 65536 * TURN + beat * PHASE_STEP;
         var direction = new Vec3(Math.cos(phase), Math.sin(phase * 2), Math.sin(phase)).normalize();
         var delta = direction.scale(length);
         var a = center.subtract(delta);
         var b = center.add(delta);
+        for (var other : neighbors) if (other.crosses(a, b)) return;
         float alpha = visibility(eye, a, b) * (subdued ? SUBDUED_ALPHA : 1);
         if (alpha <= 0) return;
         float progress = clock % PERIOD / LIFETIME;
         var tip = a.lerp(b, Math.min(clock % PERIOD / REVEAL, 1f));
         var width = direction.cross(eye.subtract(center)).normalize().scale(WIDTH);
-        mesh.slash(a, tip, width, COLOR, alpha * (1 - progress));
+        float fade = alpha * (1 - progress) * (1 - progress);
+        mesh.slash(a, tip, width, COLOR, fade);
+        mesh.slash(a, tip, width.scale(0.12), 0xD6BDB5, fade * 0.4f);
     }
 
     private static float visibility(Vec3 eye, Vec3 a, Vec3 b) {

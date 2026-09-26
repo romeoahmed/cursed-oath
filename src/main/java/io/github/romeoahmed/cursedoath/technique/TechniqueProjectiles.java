@@ -2,6 +2,7 @@ package io.github.romeoahmed.cursedoath.technique;
 
 import io.github.romeoahmed.cursedoath.CursedOath;
 import io.github.romeoahmed.cursedoath.world.TerrainDestruction;
+import net.fabricmc.fabric.api.object.builder.v1.entity.FabricEntityDataRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -31,6 +32,8 @@ public final class TechniqueProjectiles {
     private TechniqueProjectiles() {}
 
     public static void initialize() {
+        FabricEntityDataRegistry.register(
+                CursedOath.id("technique_launch_position"), TechniqueProjectile.LAUNCH_POSITION_SERIALIZER);
         Registry.register(BuiltInRegistries.ENTITY_TYPE, CursedOath.id("technique_wave"), WAVE);
         Registry.register(BuiltInRegistries.ENTITY_TYPE, CursedOath.id("technique_orb"), ORB);
     }

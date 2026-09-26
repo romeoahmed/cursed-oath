@@ -1,6 +1,7 @@
 package io.github.romeoahmed.cursedoath;
 
 import io.github.romeoahmed.cursedoath.mixin.GameTestHelperAccessor;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -11,6 +12,7 @@ import net.minecraft.gametest.framework.GameTestInfo;
 import net.minecraft.gametest.framework.GameTestListener;
 import net.minecraft.gametest.framework.GameTestRunner;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
 import org.jspecify.annotations.NullMarked;
 
 /// Scoped fixture cleanup tied to native test success, failure, and timeout notifications.
@@ -45,12 +47,18 @@ public final class TestLifecycle {
         onFinish(helper, () -> Callbacks.BLOCKS.remove(id));
     }
 
-    public static void allowDamage(GameTestHelper helper, ServerLivingEntityEvents.AllowDamage callback) {
-        var id = UUID.randomUUID();
-        Callbacks.DAMAGE.put(id, callback);
-        onFinish(helper, () -> Callbacks.DAMAGE.remove(id));
+    public static void allowDamage(
+            GameTestHelper helper,
+            Collection<? extends LivingEntity> targets,
+            ServerLivingEntityEvents.AllowDamage callback) {
+        for (var target : targets) {
+            var id = target.getUUID();
+            if (Callbacks.DAMAGE.putIfAbsent(id, callback) != null)
+                throw new IllegalStateException("Damage callback already registered for fixture target " + id);
+            onFinish(helper, () -> Callbacks.DAMAGE.remove(id));
+        }
     }
-    /// Fabric events cannot unregister; dispatchers hold only currently running fixtures.
+    // Register once: Fabric events cannot unregister listeners, but fixture callbacks must be removed.
     private static final class Callbacks {
         private static final Map<UUID, PlayerBlockBreakEvents.Before> BLOCKS = new HashMap<>();
         private static final Map<UUID, ServerLivingEntityEvents.AllowDamage> DAMAGE = new HashMap<>();
@@ -61,8 +69,8 @@ public final class TestLifecycle {
                 return callback == null || callback.beforeBlockBreak(level, player, pos, state, entity);
             });
             ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
-                for (var callback : DAMAGE.values()) if (!callback.allowDamage(entity, source, amount)) return false;
-                return true;
+                var callback = DAMAGE.get(entity.getUUID());
+                return callback == null || callback.allowDamage(entity, source, amount);
             });
         }
     }

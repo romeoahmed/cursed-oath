@@ -21,7 +21,7 @@
 
 ## 目录与依赖
 
-包根为 `io.github.romeoahmed.cursedoath`，mod ID 为 `cursed-oath`。源集位置见 [AGENTS.md](../AGENTS.md)。
+包根为 `io.github.romeoahmed.cursedoath`，mod ID 为 `cursed-oath`。源集位置见[贡献指南](../CONTRIBUTING.md#make-a-change)。
 
 | 包                           | 职责                                                             |
 | ---------------------------- | ---------------------------------------------------------------- |
@@ -38,9 +38,9 @@ Fabric Data Attachments 管理附件状态，PAL 管理玩家动画。按职责�
 
 ## Java 与注释
 
-不可变值使用 record；生命周期对象使用普通类；封闭类型层次使用 sealed。热路径优先直接循环与有界复用。空值契约由 JSpecify 与 NullAway 检查，原生 API 的可空返回值在边界处理；具体贡献约定见 [AGENTS.md](../AGENTS.md)。
+不可变值使用 record；生命周期对象使用普通类；封闭类型层次使用 sealed。热路径优先直接循环与有界复用。空值契约由 JSpecify 与 NullAway 检查，原生 API 的可空返回值在边界处理；具体贡献约定见[贡献指南](../CONTRIBUTING.md#make-a-change)。
 
-声明契约采用 Java 25 支持的 `///` Markdown Javadoc，首句概括职责，必要时链接相关类型或成员。已有方法文档说明参数、返回值及异常；覆盖方法沿用有效的继承文档，不为简单访问器补模板。局部实现原因使用 `//`，不把实现细节写成调用方保证。修改后用 JDK doclet 检查语法与引用。[Javadoc 规范](https://docs.oracle.com/en/java/javase/25/docs/specs/javadoc/doc-comment-spec.html)
+注释约定见[贡献指南](../CONTRIBUTING.md#make-a-change)。`///` 使用 Markdown；类型或成员引用使用 `[Type]`、`[#method()]`，段落间保留 `///` 空行，文档放在声明的注解之前。覆盖方法可沿用继承文档；只为调用方需要的契约补充说明。[Javadoc 规范](https://docs.oracle.com/en/java/javase/25/docs/specs/javadoc/doc-comment-spec.html)
 
 ## 状态与联网
 
@@ -49,7 +49,7 @@ Fabric Data Attachments 管理附件状态，PAL 管理玩家动画。按职责�
 - `Fighter` 绑定一个玩家实体及其世界。死亡、断线、换维度或取消会结束准备，保留已付费用与恢复负担。
 - `SorcererProfile`、`SorcererResources` 是 Codec 校验的不可变持久附件，保存资格、余额、恢复和熔断。活动施法及费用预留不续存。
 - 资源快照每四 tick 及请求处理后检查，仅变化时发给本人；加入、重生和换维度重新同步。个人资源附件不重复自动同步；信息过载和反领域表现使用临时、全观察者同步附件。
-- 请求携带连接会话 UUID、单调序号和显式 wire ID，`RequestGate` 拒绝重放并限频。确认事件包含 UUID、维度、服务端 tick、阶段和位置，按发生位置广播；客户端有界去重。
+- 请求携带连接会话 UUID、单调序号和显式 wire ID。`RequestGate` 每 tick 最多接受四个有效新请求；被限频的新序号也会消费，不能下一 tick 重放。确认事件包含 UUID、维度、服务端 tick、阶段和位置，按发生位置广播；客户端有界去重。
 - 飞行位置、插值和移除沿用原生实体跟踪。协议使用 `StreamCodec.composite`，稳定字段顺序与字节编码由兼容性测试约束。
 
 接口参考：[Data Attachments](https://docs.fabricmc.net/develop/serialization/data-attachments)、[Networking](https://docs.fabricmc.net/develop/networking)、[World Rendering](https://docs.fabricmc.net/develop/rendering/world)。
@@ -65,9 +65,9 @@ Fabric Data Attachments 管理附件状态，PAL 管理玩家动画。按职责�
 | 解      | 局部坐标中的保守旋转盒体扫掠；前方短段挖掘后推进，等待时仍检查主体接触                                                                                                                  |
 | 捌      | `CleaveLattice` 共用实体、地形和显示网格；初始接触立即判伤，其余目标在开路后复核位置与遮挡                                                                                              |
 
-茈/解纳入目标一 tick 的相对运动，宽相位额外覆盖四格移动；任意高速位移或传送不在保证范围内。扫掠缓冲只在所属服务器线程顺序复用。伤害回调可能移除攻击实体、关闭地形任务或改变后续目标；回调之后、继续处理目标或提交地形前复核相关实体与工作是否有效。
+茈/解纳入目标一 tick 的相对运动，宽相位额外覆盖四格移动；任意高速位移或传送不在保证范围内。扫掠缓冲只在所属服务器线程顺序复用。伤害回调可能移除攻击、关闭地形工作或转移目标，因此后续处理须复核实例与世界；不能将一次批次开始时的状态视为始终有效。
 
-`TerrainDestruction` 在普通破坏术式准备时预留工作槽，以服务器为单位轮转处理。执行中的任务仍占用工作槽，原生回调中再次申请也不能突破容量。领域按需申请地形任务，必中不依赖申请结果。
+`TerrainDestruction` 在普通破坏术式准备时预留工作槽；队列由 Fabric `GlobalAttachments` 随服务器实例持有，在全部维度之间共用预算并轮转处理，不存盘、不跨服务器保留。执行中的任务仍占用工作槽，原生回调中再次申请也不能突破容量。`Work.persistent` 只控制空闲时是否保留预留，不代表存盘。领域按需申请地形任务，必中不依赖申请结果。
 
 | 服务器总限制               | 当前值    |
 | -------------------------- | --------- |
@@ -99,15 +99,17 @@ Fabric Data Attachments 管理附件状态，PAL 管理玩家动画。按职责�
 
 `CastingAnimation` 隔离 PAL，按确认阶段播放准备和释放动作，动画不驱动伤害或位移。`LimitlessEffects` 生成不可变形态：`EnergySurface` 用缓存球面、分块顶点色及深度写入绘制主体；`EnergyTrails` 绘制加色光晕、流带和尾迹。空间相位与调色板缓存，融合时更新颜色；48 格外降低细节。苍的碎屑用有限原生 BLOCK 粒子，暂停时停止发射，换世界时清空。
 
-几何通过 `SubmitNodeCollector`、原生 `RenderPipeline` 和 `OitPipelineSet` 提交。普通效果复用原版 shader；无量空处的片元程序只采样全景纹理并处理显现和接缝。Mod 不持有 Vulkan 句柄或插入 GPU 等待，修改混合方式时同时核对深度写入与透明排序。[Minecraft 渲染说明](https://www.minecraft.net/en-us/article/minecraft-java-edition-26-3)、[GLSL 规范](https://github.com/KhronosGroup/GLSL)
+投射物通过 Fabric 注册的自定义实体数据序列化器同步固定释放位置，复用原生 `Vec3.STREAM_CODEC`；迟到的观察者也能取得同一原点。视觉扩张依据提取帧的实际位移，不用客户端实体年龄代替路程。本地第一人称在准备端点与网络轨迹之间交接，修正只写入渲染快照，不修改实体位置或原生插值；碰撞和伤害仍由服务端结算。
 
-御厨子在资源重载时读取预变换、预着色的模型面，使用不透明深度管线。装饰斩线由领域年龄与局部空间格决定，不创建斩击实体或逐斩网络消息；近镜头淡出，减闪光选项来自提取快照。本地斩击音按固定节奏产生。
+几何通过 `SubmitNodeCollector`、原生 `RenderPipeline` 和 `OitPipelineSet` 提交，复用原版着色器。Mod 不持有 Vulkan 句柄或插入 GPU 等待，修改混合方式时同时核对深度写入与透明排序。[Minecraft 渲染说明](https://www.minecraft.net/en-us/article/minecraft-java-edition-26-3)
 
-无量空处的内部球面随相机平移并保持施术朝向，外壳固定于领域中心。环境 Mixin 读取当前提取帧，隐藏内部地形、天气、云和方块实体，保留原世界碰撞与模拟；退出后恢复正常提交。
+御厨子在资源重载时读取预变换、预着色的模型面，使用不透明深度管线。雾色在原生 `FogRenderer` 完成计算后调整，仅在空气中作用，并保留更短的原生可视距离。装饰斩线由领域年龄与局部空间格决定，不创建斩击实体或逐斩网络消息；近镜头淡出，减闪光选项来自提取快照。本地斩击音按固定节奏产生。
+
+无量空处使用原版 `position_tex_color` 着色器，顶点色负责淡入和接缝；短暂展开过渡使用顶点色几何。内部球面随相机平移并保持施术朝向，外壳固定于领域中心。相交领域的位置与半径在提取阶段快照化，渲染回调不查询实体。环境 Mixin 读取当前提取帧，隐藏内部地形、天气、云和方块实体，保留原世界碰撞与模拟；退出后恢复正常提交。
 
 ## 验证
 
-命令见 [AGENTS.md](../AGENTS.md)，CI 见 [build.yml](../.github/workflows/build.yml)。Spotless、Error Prone、NullAway 与 JaCoCo 接入构建；`javac` 开启 lint 并将警告视为错误。关闭 `classfile` 类别的告警以兼容 JOML 的旧字节码，源码 lint 保留。Mixin 注入回调用 `@Keep` 表明框架入口；实例身份比较只在确有需要的方法上说明并豁免对应检查。[Error Prone 插件](https://github.com/tbroyer/gradle-errorprone-plugin)、[NullAway JSpecify 模式](https://github.com/uber/NullAway/wiki/JSpecify-Support)、[JSpecify](https://jspecify.dev/docs/user-guide/)
+验证命令见[贡献指南](../CONTRIBUTING.md#verify-your-work)，CI 见 [build.yml](../.github/workflows/build.yml)。Spotless、Error Prone、NullAway 与 JaCoCo 接入构建；`javac` 开启 lint 并将警告视为错误。关闭 `classfile` 类别的告警以兼容 JOML 的旧字节码，源码 lint 保留。Mixin 注入回调用 `@Keep` 表明框架入口；实例身份比较只在确有需要的方法上说明并豁免对应检查。[Error Prone 插件](https://github.com/tbroyer/gradle-errorprone-plugin)、[NullAway JSpecify 模式](https://github.com/uber/NullAway/wiki/JSpecify-Support)、[JSpecify](https://jspecify.dev/docs/user-guide/)
 
 | 层次                       | 检查内容                                             |
 | -------------------------- | ---------------------------------------------------- |
@@ -119,10 +121,17 @@ Fabric Data Attachments 管理附件状态，PAL 管理玩家动画。按职责�
 
 断言以外部行为为主；账本、稳定协议字节和几何边界保留直接测试，不固定私有布局或遍历顺序。JaCoCo 的 90% 行覆盖只约束 `CursedEnergy` 与 `RequestGate`。单元测试直接使用 JUnit Jupiter，JUnit BOM 统一版本。GameTest 是 Loom 管理的独立测试源集；测试代码与依赖不进入发布 JAR。
 
-服务端夹具由 `CombatFixtures`、`TestLifecycle` 按测试持有；原生完成监听器在成功、失败及超时时清理。测试 accessor 仅用于访问 `GameTestHelper.testInfo`，不进入发布 JAR。Fabric 事件只注册一次，临时回调随测试结束移除；共享容量通过测试环境分组隔离，测试不得调用全局清理。
+测试按以下边界组织：
 
-异步行为使用测试序列等待；只有隔离攻击/碰撞钩子的夹具手动推进实体。位移测试保留物理模拟。客户端使用同次运行基线、固定机位与分辨率，旁观者用于独立效果，普通玩家用于输入和施法。像素断言不评价美术质量。[Fabric 自动测试](https://docs.fabricmc.net/develop/automatic-testing)
+- **断言：**纯函数保持顺序无关，参数化测试逐例报告；协议测试检查稳定字节与连续消息边界。保护和“仅命中一次”必须等相关操作完成后确认。
+- **隔离：**`CombatFixtures` 持有实体与工作，`TestLifecycle` 通过原生完成监听器在成功、失败和超时时清理。Fabric 事件只注册一次，再按施术者或目标分派临时回调；测试结束即移除。测试 accessor 仅提供完成监听入口。
+- **场地：**完整茈飞行使用 160 格长的 `flight`，局部碰撞使用 `arena`；容量敏感测试通过环境分组隔离。投射物按实例清理，不能只扫描结构内实体或调用全局重置。
+- **等待：**异步行为由测试序列等待；只有隔离攻击/碰撞钩子时手动推进。联网和区块就绪使用框架屏障，固定时间仅用于动画采样、持续性边界或效果退场。
+- **客户端：**入口依次覆盖操作、发射连续性、无下限战斗、投射物、领域及界面/效果。各入口创建并关闭自己的世界；框架恢复选项、按键和窗口，夹具恢复语言和临时视角。独立画面使用旁观者，真实输入使用普通玩家。
+- **截图：**使用同次运行基线与固定机位、分辨率；逐帧连续性断言只保存关键帧。像素比较验证效果出现和消失，美术质量仍需人工检查。
 
-先 `build`，再完整运行 `runClientGameTest`，防止服务端清理删除截图。客户端任务先检查原生 Vulkan 设备与显示表面，预检超时上限为 30 秒；测试再断言游戏实际后端。Linux CI 使用 Xvfb/X11 与 Mesa Lavapipe；设备直接创建只存在于测试预检。[SDL 驱动](https://wiki.libsdl.org/SDL3/SDL_HINT_VIDEO_DRIVER)、[Vulkan 驱动选择](https://vulkan.lunarg.com/doc/view/latest/linux/LoaderDriverInterface.html)
+参考：[JUnit 参数化测试](https://docs.junit.org/6.1.3/writing-tests/parameterized-classes-and-tests.html)、[Fabric 自动测试](https://docs.fabricmc.net/develop/automatic-testing)。
+
+`build` 中先运行单元测试，再启动服务端 GameTest；单独运行 `runGameTest` 不强制重跑单元测试。随后完整运行 `runClientGameTest`，防止服务端清理删除截图。客户端任务先检查原生 Vulkan 设备与显示表面，预检超时上限为 30 秒；测试再断言游戏实际后端。Linux CI 使用 Xvfb/X11 与 Mesa Lavapipe；设备直接创建只存在于测试预检。[SDL 驱动](https://wiki.libsdl.org/SDL3/SDL_HINT_VIDEO_DRIVER)、[Vulkan 驱动选择](https://vulkan.lunarg.com/doc/view/latest/linux/LoaderDriverInterface.html)
 
 CI 使用仓库只读权限，同一分支的新运行取消旧运行；未取消的运行无论成败均收集现有报告、日志和截图，成功后上传 JAR。共享 CI 耗时不作为性能基准。模型工具只依赖 Python 标准库，制作检查见[模型说明](../art/shrine/README.md)。

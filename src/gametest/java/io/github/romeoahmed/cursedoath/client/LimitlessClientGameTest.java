@@ -22,7 +22,7 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import org.jspecify.annotations.NullMarked;
 
 @NullMarked
-public final class PurpleClientGameTest implements FabricClientGameTest {
+public final class LimitlessClientGameTest implements FabricClientGameTest {
     private static final BlockPos WALL_CENTER = new BlockPos(0, -49, 10);
     private static final int LIGHT_TRANSITION_TICKS = 20, DEBRIS_EXPIRY = 40, SEPARATION_TICKS = 10, CHARGE_TICKS = 38;
     private static final double AFTER_WALL_Z = 30.0,

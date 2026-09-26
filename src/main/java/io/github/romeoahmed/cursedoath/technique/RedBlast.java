@@ -20,8 +20,12 @@ final class RedBlast {
 
     static void impact(ServerPlayer player, Vec3 center, Vec3 direction) {
         var bounds = AABB.ofSize(center, RADIUS * 2, RADIUS * 2, RADIUS * 2);
-        for (var target : player.level().getEntitiesOfClass(LivingEntity.class, bounds))
+        var level = player.level();
+        for (var target : level.getEntitiesOfClass(LivingEntity.class, bounds)) {
+            if (!TechniqueCombat.isActive(player, level)) return;
+            if (!target.level().equals(level)) continue;
             repel(player, target, center, direction);
+        }
     }
 
     private static void repel(ServerPlayer player, LivingEntity target, Vec3 center, Vec3 direction) {
@@ -35,7 +39,9 @@ final class RedBlast {
         if (strength <= 0) return;
         var level = player.level();
         var source = level.damageSources().playerAttack(player);
-        if (target.hurtServer(level, source, (float) (DAMAGE * strength))) {
+        if (target.hurtServer(level, source, (float) (DAMAGE * strength))
+                && !target.isRemoved()
+                && target.level().equals(level)) {
             // Native knockback is horizontal; this technique also works when aimed vertically.
             double resistance = target.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE);
             TechniqueCombat.push(

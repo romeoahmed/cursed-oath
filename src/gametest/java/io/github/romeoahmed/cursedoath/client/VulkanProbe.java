@@ -11,7 +11,7 @@ import org.lwjgl.sdl.SDLError;
 import org.lwjgl.sdl.SDLInit;
 import org.lwjgl.sdl.SDLVideo;
 
-/// Fail without a dialog when Minecraft cannot create a Vulkan device and presentation surface.
+/// Fails without a dialog when a Vulkan device or presentation surface cannot be created.
 @NullMarked
 public final class VulkanProbe {
     private static final int PROBE_SIZE = 64;

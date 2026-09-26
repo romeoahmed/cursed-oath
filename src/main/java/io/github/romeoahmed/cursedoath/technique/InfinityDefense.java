@@ -37,7 +37,7 @@ public final class InfinityDefense {
     }
 
     private static boolean bypasses(ServerPlayer player, ServerPlayer attacker) {
-        return CombatRuntime.fighter(attacker).defense().amplification()
+        return CombatRuntime.hasAmplification(attacker)
                 && attacker.getBoundingBox()
                                 .distanceToSqr(player.getBoundingBox().getCenter())
                         <= CONTACT_RANGE_SQUARED;

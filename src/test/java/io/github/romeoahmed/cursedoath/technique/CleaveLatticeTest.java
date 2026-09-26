@@ -20,8 +20,8 @@ class CleaveLatticeTest {
             assertTrue(intersects.test(AABB.ofSize(new Vec3(offset, 1.0, 4.0), 0.1, 0.1, 0.1)));
             assertTrue(intersects.test(AABB.ofSize(new Vec3(1.0, offset, 4.0), 0.1, 0.1, 0.1)));
         }
-        assertTrue(!intersects.test(AABB.ofSize(new Vec3(0.0, 0.0, 10.0), 0.1, 0.1, 0.1)));
-        assertTrue(!intersects.test(AABB.ofSize(new Vec3(1.0, 1.0, 4.0), 0.5, 0.5, 0.5)));
-        assertTrue(!intersects.test(AABB.ofSize(new Vec3(8.0, 0.0, 4.0), 0.5, 0.5, 0.5)));
+        assertFalse(intersects.test(AABB.ofSize(new Vec3(0.0, 0.0, 10.0), 0.1, 0.1, 0.1)));
+        assertFalse(intersects.test(AABB.ofSize(new Vec3(1.0, 1.0, 4.0), 0.5, 0.5, 0.5)));
+        assertFalse(intersects.test(AABB.ofSize(new Vec3(8.0, 0.0, 4.0), 0.5, 0.5, 0.5)));
     }
 }

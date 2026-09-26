@@ -20,7 +20,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/// Hide scenery for the extracted frame; world blocks and entity simulation remain untouched.
+/// Hides scenery for the extracted frame without changing world blocks or entity simulation.
 @Mixin(LevelRenderer.class)
 abstract class DomainEnvironmentMixin {
     @Unique

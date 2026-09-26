@@ -70,6 +70,11 @@ class ShrineExportTest(unittest.TestCase):
                     matches = [face for face in faces if all(vertex[axis] == coordinate for vertex in face["vertices"])]
                     self.assertEqual(len(matches), 1)
                     self.assertEqual(matches[0]["color"], expected)
+                    a, b, c = matches[0]["vertices"][:3]
+                    u = [b[i] - a[i] for i in range(3)]
+                    v = [c[i] - a[i] for i in range(3)]
+                    normal = u[(axis + 1) % 3] * v[(axis + 2) % 3] - u[(axis + 2) % 3] * v[(axis + 1) % 3]
+                    self.assertGreater(normal * (2 * coordinate - 1), 0, "Cube faces must point outward")
 
     def test_invalid_geometry_fails_with_a_useful_reason(self):
         cases = [

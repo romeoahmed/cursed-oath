@@ -180,7 +180,6 @@ public final class RenderClientGameTest implements FabricClientGameTest {
             verifyEffect(context, new Effect(Technique.CLEAVE, TechniqueEvent.BLACK_FLASH, EFFECT_AGE, 0, false), true);
         } finally {
             context.runOnClient(client -> {
-                TechniqueVisuals.clear();
                 if (client.gui.hud.isHidden() != hidden) client.gui.hud.toggle();
             });
         }
@@ -210,13 +209,12 @@ public final class RenderClientGameTest implements FabricClientGameTest {
         boolean reverse = effect.reverse();
         context.getInput().lookAt(0f, pitch);
         context.waitTick();
-        context.runOnClient(client -> TechniqueVisuals.clear());
         var label = stage == TechniqueEvent.BLACK_FLASH
                 ? "black-flash"
                 : technique.name().toLowerCase(Locale.ROOT);
         var name = label + "-" + (int) pitch + "-" + (reverse ? "back" : "front") + "-" + stage + "-" + age;
         var baseline = capture(context, name + "-before");
-        context.runOnClient(client -> {
+        var event = context.computeOnClient(client -> {
             var player = requireNonNull(client.player);
             var level = requireNonNull(client.level);
             var direction = player.getLookAngle();
@@ -227,21 +225,35 @@ public final class RenderClientGameTest implements FabricClientGameTest {
                     : technique == Technique.CLEAVE && stage != TechniqueEvent.BLACK_FLASH && pitch == 0
                             ? destination
                             : player.getEyePosition();
-            TechniqueVisuals.accept(new TechniqueEvent(
+            return new TechniqueEvent(
                     level.dimension().identifier(),
                     UUID.randomUUID(),
-                    stage == TechniqueEvent.PREPARE ? -1 : player.getId(),
+                    -1,
                     technique.wireId(),
                     stage,
                     level.getGameTime() - age,
                     origin,
-                    destination));
+                    destination);
         });
-        checkEffect(context, baseline, name, true);
-        if (verifyExpiry) {
-            int lifetime = stage == TechniqueEvent.PREPARE ? technique.preparation() : EFFECT_EXPIRY;
-            context.waitTicks(Math.max(lifetime - age + 2, 1));
-            checkEffect(context, baseline, name + "-expired", false);
+        context.runOnClient(client -> TechniqueVisuals.accept(event));
+        try {
+            checkEffect(context, baseline, name, true);
+            if (verifyExpiry) {
+                int lifetime = stage == TechniqueEvent.PREPARE ? technique.preparation() : EFFECT_EXPIRY;
+                context.waitTicks(Math.max(lifetime - age + 2, 1));
+                checkEffect(context, baseline, name + "-expired", false);
+            }
+        } finally {
+            if (stage == TechniqueEvent.PREPARE)
+                context.runOnClient(client -> TechniqueVisuals.accept(new TechniqueEvent(
+                        event.dimension(),
+                        event.id(),
+                        event.actor(),
+                        event.technique(),
+                        TechniqueEvent.CANCEL,
+                        event.tick(),
+                        event.origin(),
+                        event.destination())));
         }
     }
 }

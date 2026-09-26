@@ -8,7 +8,6 @@ import io.github.romeoahmed.cursedoath.combat.CursedEnergy;
 import io.github.romeoahmed.cursedoath.combat.SorcererAttachments;
 import io.github.romeoahmed.cursedoath.combat.SorcererProfile;
 import io.github.romeoahmed.cursedoath.technique.Technique;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -30,7 +29,6 @@ public final class TerrainDestructionGameTest {
         helper.setBlock(position, Blocks.STONE);
         var work = requireNonNull(reserveTerrain(helper, player));
         work.sphere(Vec3.atCenterOf(absolute), 1);
-        var reservations = new ArrayList<TerrainDestruction.Work>();
         var visited = new AtomicBoolean();
         var rejected = new AtomicBoolean();
         beforeBlockBreak(helper, player, (level, actor, pos, state, entity) -> {
@@ -40,13 +38,10 @@ public final class TerrainDestructionGameTest {
             }
             return true;
         });
+        var reservations = saturateTerrain(helper, player);
         try {
-            while (true) {
-                var reservation = reserveTerrain(helper, player);
-                if (reservation == null) break;
-                reservations.add(reservation);
-            }
-            for (int tick = 0; tick < 10 && !visited.get(); tick++) TerrainDestruction.tick();
+            for (int tick = 0; tick < 10 && !visited.get(); tick++)
+                TerrainDestruction.tick(helper.getLevel().getServer());
             helper.assertTrue(visited.get(), "The block callback must run");
             helper.assertTrue(rejected.get(), "Executing work must retain its slot during a native block callback");
         } finally {
@@ -102,13 +97,8 @@ public final class TerrainDestructionGameTest {
     public void capacityRejectionDoesNotSpendEnergy(GameTestHelper helper) {
         var player = caster(helper);
         player.setAttached(SorcererAttachments.PROFILE, SorcererProfile.practiceProfile());
-        var reservations = new ArrayList<TerrainDestruction.Work>();
+        var reservations = saturateTerrain(helper, player);
         try {
-            while (true) {
-                var reservation = reserveTerrain(helper, player);
-                if (reservation == null) break;
-                reservations.add(reservation);
-            }
             var fighter = fighter(helper, player);
             fighter.prepare(Technique.PURPLE);
             helper.assertTrue(fighter.cast() == null, "An over-capacity cast must be rejected");
@@ -146,11 +136,11 @@ public final class TerrainDestructionGameTest {
         blocks.forEach(pos -> helper.setBlock(pos, Blocks.DIRT));
         var work = requireNonNull(reserveTerrain(helper, player));
         work.sphere(helper.absoluteVec(new Vec3(9.0, 8.0, 10.0)), 9.0);
-        TerrainDestruction.tick();
+        TerrainDestruction.tick(helper.getLevel().getServer());
         var removed =
                 blocks.stream().filter(pos -> helper.getBlockState(pos).isAir()).count();
         helper.assertTrue(
-                removed >= 0 && removed <= TerrainDestruction.WRITES_PER_TICK,
+                removed <= TerrainDestruction.WRITES_PER_TICK,
                 "A tick must stay within the direct block-removal budget");
         helper.assertTrue(!work.finished(), "A large operation must wait across ticks");
         work.close();

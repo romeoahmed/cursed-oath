@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.UUID;
 import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -129,6 +130,11 @@ public final class TechniqueCombat {
 
     public static boolean hasInfinity(LivingEntity target) {
         return target instanceof ServerPlayer player && CombatRuntime.hasInfinity(player);
+    }
+
+    @SuppressWarnings("ReferenceEquality") // Caster-bound attacks cannot follow a transferred player.
+    static boolean isActive(ServerPlayer player, ServerLevel level) {
+        return player.isAlive() && !player.isRemoved() && !player.isSpectator() && player.level() == level;
     }
 
     public static @Nullable HitResult contact(ServerPlayer player, double range) {

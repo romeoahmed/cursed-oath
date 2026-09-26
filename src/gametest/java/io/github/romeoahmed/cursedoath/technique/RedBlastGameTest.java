@@ -4,6 +4,7 @@ import static io.github.romeoahmed.cursedoath.CombatFixtures.*;
 import static io.github.romeoahmed.cursedoath.TestLifecycle.*;
 import static java.util.Objects.requireNonNull;
 
+import java.util.List;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -32,17 +33,18 @@ public final class RedBlastGameTest {
     }
 
     @GameTest(structure = "cursed-oath-test:arena")
-    public void redAffectsExposedNeighborsBeforeExcavation(GameTestHelper helper) {
+    public void damageVetoProtectsOnlyItsTargetAndLeavesNeighboringHitsIntact(GameTestHelper helper) {
         var player = caster(helper);
         var direct = helper.spawnWithNoFreeWill(EntityTypes.HUSK, new BlockPos(2, 1, 4));
         var neighbor = helper.spawnWithNoFreeWill(EntityTypes.HUSK, new BlockPos(4, 1, 4));
         var far = helper.spawnWithNoFreeWill(EntityTypes.HUSK, new BlockPos(14, 1, 4));
         var marker = new BlockPos(2, 0, 4);
         helper.setBlock(marker, Blocks.STONE);
+        allowDamage(helper, List.of(direct), (entity, source, amount) -> false);
         var before = neighbor.getHealth();
         var farHealth = far.getHealth();
         RedBlast.impact(player, helper.absoluteVec(IMPACT), player.getLookAngle());
-        helper.assertTrue(direct.getHealth() < direct.getMaxHealth(), "The direct impact must cause damage");
+        helper.assertTrue(direct.getHealth() == direct.getMaxHealth(), "The scoped damage veto protects its target");
         helper.assertTrue(neighbor.getHealth() < before, "The exposed neighbor must receive the impact wave");
         helper.assertTrue(far.getHealth() == farHealth, "Red must remain bounded by its impact radius");
         helper.assertBlockPresent(Blocks.STONE, marker);

@@ -6,10 +6,12 @@ import io.github.romeoahmed.cursedoath.combat.Fighter;
 import io.github.romeoahmed.cursedoath.domain.Domains;
 import io.github.romeoahmed.cursedoath.technique.Technique;
 import io.github.romeoahmed.cursedoath.technique.TechniqueCombat;
+import io.github.romeoahmed.cursedoath.technique.TechniqueOrb;
 import io.github.romeoahmed.cursedoath.technique.TechniqueProjectiles;
 import io.github.romeoahmed.cursedoath.technique.TechniqueWave;
 import io.github.romeoahmed.cursedoath.world.TerrainDestruction;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -53,6 +55,11 @@ public final class CombatFixtures {
         player.setYRot(0);
         player.setXRot(0);
         TestLifecycle.onFinish(helper, () -> {
+            // Flights can leave the structure before completion, including releases made directly by a test.
+            level.getEntities(TechniqueProjectiles.ORB, orb -> orb.getOwner() == player)
+                    .forEach(Entity::discard);
+            level.getEntities(TechniqueProjectiles.WAVE, wave -> wave.getOwner() == player)
+                    .forEach(Entity::discard);
             var domain = Domains.ownedBy(player);
             if (domain != null) Domains.end(domain);
             for (var fighter : CombatRuntime.fighters(player.level()))
@@ -73,20 +80,41 @@ public final class CombatFixtures {
         return waves.getFirst();
     }
 
+    @SuppressWarnings("ReferenceEquality") // Identify projectiles created by this fixture.
+    public static TechniqueOrb launchOrb(GameTestHelper helper, ServerPlayer player, Technique technique) {
+        release(helper, player, technique);
+        var orbs = helper.getLevel().getEntities(TechniqueProjectiles.ORB, orb -> orb.getOwner() == player);
+        if (orbs.size() != 1) throw new IllegalStateException("Expected exactly one fixture orb");
+        return orbs.getFirst();
+    }
+
     public static TerrainDestruction.@Nullable Work reserveTerrain(GameTestHelper helper, ServerPlayer player) {
         var work = TerrainDestruction.reserve(player);
         if (work != null) TestLifecycle.onFinish(helper, work::close);
         return work;
     }
 
-    @SuppressWarnings("ReferenceEquality") // Scope asynchronous cleanup to this fixture's entities.
-    public static void release(GameTestHelper helper, ServerPlayer player, Technique technique) {
+    public static List<TerrainDestruction.Work> saturateTerrain(GameTestHelper helper, ServerPlayer player) {
+        var reservations = new ArrayList<TerrainDestruction.Work>();
+        // A broken capacity guard must fail instead of hanging the server thread inside the test timeout.
+        for (int attempt = 0; attempt < 1024; attempt++) {
+            var work = reserveTerrain(helper, player);
+            if (work == null) return reservations;
+            reservations.add(work);
+        }
+        throw new IllegalStateException("Terrain capacity accepted 1,024 simultaneous reservations");
+    }
+
+    @SuppressWarnings("ReferenceEquality") // Capture instances before an owner is removed or replaced.
+    public static TerrainDestruction.@Nullable Work release(
+            GameTestHelper helper, ServerPlayer player, Technique technique) {
         var work = technique.destroysTerrain() ? Objects.requireNonNull(reserveTerrain(helper, player)) : null;
         TechniqueCombat.release(player, UUID.randomUUID(), technique, work);
         var projectiles = new ArrayList<Entity>();
         projectiles.addAll(helper.getLevel().getEntities(TechniqueProjectiles.ORB, orb -> orb.getOwner() == player));
         projectiles.addAll(helper.getLevel().getEntities(TechniqueProjectiles.WAVE, wave -> wave.getOwner() == player));
         TestLifecycle.onFinish(helper, () -> projectiles.forEach(Entity::discard));
+        return work;
     }
 
     public static Fighter fighter(GameTestHelper helper, ServerPlayer player) {

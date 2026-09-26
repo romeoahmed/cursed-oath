@@ -60,6 +60,11 @@ public final class SweptVolume {
         return entry(box, Vec3.ZERO);
     }
 
+    /// Tests relative motion against the target's end-of-step bounds.
+    ///
+    /// @param box target bounds at the end of the step
+    /// @param movement target displacement during the same step
+    /// @return first segment fraction in `[0, 1]`, or `null` when there is no contact
     public @Nullable Double entry(AABB box, Vec3 movement) {
         if (sphere != null)
             return (movement.equals(Vec3.ZERO) ? sphere : new SphereSweep(start.add(movement), end, halfSize.x))

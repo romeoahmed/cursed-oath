@@ -54,12 +54,12 @@ src/client/resources/assets/cursed-oath/lang/
 
 玩家可见名称、提示、按键、状态及拒绝原因均使用翻译键，例如 `ability.cursed-oath.limitless.blue`、`hud.cursed-oath.preparing`、`message.cursed-oath.busy`。显示名称变化不修改注册 ID、存档键或协议值。
 
-用 `Component.translatable` 构造整句文本，参数采用可重排的 `%1$s`、`%2$s`。技能名作为可翻译子组件，按键名读取实际绑定；可重排占位符只保证语序，不自动本地化数字格式；有分组、小数等需求时在客户端处理。服务端传结构化原因或翻译组件，不调用客户端语言服务。[Fabric Text and Translations](https://docs.fabricmc.net/develop/text-and-translations)
+用 `Component.translatable` 构造整句文本，参数采用可重排的 `%1$s`、`%2$s`。技能名作为可翻译子组件，按键名读取实际绑定；占位符允许调整语序；数字的分组、小数等本地化格式需在客户端另行处理。服务端传结构化原因或翻译组件，不调用客户端语言服务。[Fabric Text and Translations](https://docs.fabricmc.net/develop/text-and-translations)
 
 ## 验证
 
 `LocalizationTest` 检查 JSON 字符串值、重复键、非空文本、三语键集、术式全称、轮盘短名称和索引占位符。键是否仍在使用需结合注册及动态生成规则判断，不能仅按文本搜索结果删除。
 
-HUD 状态行、轮盘全称和操作提示按字体宽度换行；HUD 短名称与轮盘按钮仍为单行，译文须控制长度。客户端测试覆盖三语 HUD、标准窗口与 640×480 窗口轮盘；大 UI 比例、罕见汉字、输入法和新增长译名仍需实机检查。
+HUD 状态、轮盘全称和操作提示按字体宽度换行；HUD 术式短名称和轮盘按钮为单行，译文须控制长度。客户端测试覆盖三语 HUD、标准窗口与 640×480 窗口轮盘；大 UI 比例、罕见汉字、输入法和新增长译名仍需实机检查。
 
 审校时区分反转术式与术式反转、极之番与最大输出、御厨子与伏魔御厨子。检查提示是否准确描述当前行为，不把计划或原作能力写成已实现功能。

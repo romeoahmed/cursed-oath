@@ -28,4 +28,4 @@ The tools use only Python's standard library. Tests cover transforms, winding, l
 
 ## References
 
-The model was constructed within the project using supplied manga and community-model screenshots as visual references; no external model geometry was imported. Reference panels and animation frames are not distributed as game assets. Canon and adaptation evidence are tracked in [sources](../../docs/sources.zh-CN.md#领域图像参考与改编).
+The model was built for this project using supplied manga panels and community-model screenshots as visual references. External geometry and reference panels are not included in the runtime assets. Canon and adaptation evidence are tracked in [sources](../../docs/sources.zh-CN.md#领域图像参考与改编).

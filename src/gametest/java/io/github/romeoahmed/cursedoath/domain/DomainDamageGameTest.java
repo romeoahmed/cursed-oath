@@ -6,10 +6,12 @@ import static java.util.Objects.requireNonNull;
 
 import io.github.romeoahmed.cursedoath.combat.CombatRuntime;
 import io.github.romeoahmed.cursedoath.technique.Technique;
+import java.util.List;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.network.protocol.game.ServerboundPlayerLoadedPacket;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -21,6 +23,7 @@ import net.minecraft.world.entity.npc.villager.Villager;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import org.jspecify.annotations.NullMarked;
 
@@ -29,6 +32,37 @@ public final class DomainDamageGameTest {
     private static final long BEFORE_PULSE = 5, AFTER_PULSE = 11, AFTER_SECOND_PULSE = 21;
     private static final int EFFECT_DURATION = 100;
     private static final float FIRST_HEALTH = 108, SECOND_HEALTH = 68;
+
+    @GameTest(environment = "cursed-oath-test:domains")
+    public void sureHitSkipsPlayersTransferredByAnEarlierDamageCallback(GameTestHelper helper) {
+        var caster = caster(helper);
+        // Keep this 96-block domain clear of neighboring fixtures in the same batch.
+        caster.setPos(caster.position().add(0, 128, 0));
+        var first = caster(helper);
+        var second = caster(helper);
+        var targets = List.of(first, second);
+        var level = helper.getLevel();
+        var otherLevel = requireNonNull(level.getServer().getLevel(Level.NETHER));
+        for (var target : targets) {
+            target.setPos(caster.position().add(0, 0, 4));
+            level.addNewPlayer(target);
+            target.connection.handleAcceptPlayerLoad(new ServerboundPlayerLoadedPacket());
+        }
+        Domains.open(caster, Technique.MALEVOLENT_SHRINE);
+        int[] hits = {0};
+        allowDamage(helper, targets, (target, source, amount) -> {
+            hits[0]++;
+            for (var other : targets) if (!other.equals(target)) other.setServerLevel(otherLevel);
+            return true;
+        });
+        try {
+            Domains.tick();
+            helper.assertTrue(hits[0] == 1, "Transferred players must leave the sure-hit batch; hits=" + hits[0]);
+        } finally {
+            for (var target : targets) target.setServerLevel(level);
+        }
+        helper.succeed();
+    }
 
     @GameTest(environment = "cursed-oath-test:domains")
     public void overloadStopsNativeAttackUseAndCastingButExemptsSpectators(GameTestHelper helper) {

@@ -21,11 +21,16 @@ final class BlueField {
 
     private BlueField() {}
 
-    static void tick(ServerPlayer owner, Vec3 center, int age) {
+    static void tick(ServerPlayer owner, TechniqueOrb orb) {
+        var center = orb.position();
         var bounds = AABB.ofSize(center, RADIUS * 2, RADIUS * 2, RADIUS * 2);
-        boolean crush = (age - 1) % DAMAGE_INTERVAL == 0;
-        for (var target : owner.level().getEntitiesOfClass(LivingEntity.class, bounds))
+        boolean crush = (orb.tickCount - 1) % DAMAGE_INTERVAL == 0;
+        var level = owner.level();
+        for (var target : level.getEntitiesOfClass(LivingEntity.class, bounds)) {
+            if (orb.isRemoved() || !TechniqueCombat.isActive(owner, level)) return;
+            if (!target.level().equals(level)) continue;
             pull(owner, target, center, crush);
+        }
     }
 
     private static void pull(ServerPlayer owner, LivingEntity target, Vec3 center, boolean crush) {

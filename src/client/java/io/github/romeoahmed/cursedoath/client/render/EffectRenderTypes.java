@@ -41,7 +41,7 @@ public final class EffectRenderTypes {
                     .withVertexShader("core/position_tex_color")
                     .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX_COLOR)
                     .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
-                    .withFragmentShader(CursedOath.id("core/void"))
+                    .withFragmentShader("core/position_tex_color")
                     .withColorTargetState(ColorTargetState.DEFAULT)
                     .withDepthStencilState(DepthStencilState.DEFAULT)
                     .build());
