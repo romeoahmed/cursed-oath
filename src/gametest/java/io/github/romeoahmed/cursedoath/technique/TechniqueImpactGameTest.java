@@ -75,20 +75,16 @@ public final class TechniqueImpactGameTest {
 
     private static final Vec3 ORIGIN = new Vec3(14.5, 10.0, 9.5);
     private static final BlockPos TARGET = new BlockPos(14, 10, 14);
-    private static final int SETTLE_TICKS = 20, MIN_CLEAVE_BLOCKS = 100;
+    private static final int MIN_CLEAVE_BLOCKS = 100;
     private static final float HEALTH = 500;
 
     @GameTest(environment = "cursed-oath-test:power", structure = "cursed-oath-test:arena", maxTicks = 100)
-    @SuppressWarnings("ReferenceEquality") // Verify live entity ownership, not equality by entity ID.
     public void blueDeliversItsCompleteCompressionOutput(GameTestHelper helper) {
         var player = caster(helper);
         player.setPos(helper.absoluteVec(ORIGIN));
         helper.getLevel().addNewPlayer(player);
         var target = durableTarget(helper, TARGET);
-        release(helper, player, Technique.BLUE);
-        var orbs = helper.getLevel().getEntities(TechniqueProjectiles.ORB, orb -> orb.getOwner() == player);
-        helper.assertTrue(orbs.size() == 1, "Release must create exactly one owned orb");
-        var orb = orbs.getFirst();
+        var orb = launchOrb(helper, player, Technique.BLUE);
         orb.setPos(target.getBoundingBox().getCenter());
         orb.setDeltaMovement(Vec3.ZERO);
         helper.runAfterDelay(TechniqueTuning.BLUE_DURATION + 1L, () -> {
@@ -139,6 +135,11 @@ public final class TechniqueImpactGameTest {
         var player = caster(helper);
         player.setPos(helper.absoluteVec(ORIGIN));
         var target = durableTarget(helper, new BlockPos(14, 10, 11));
+        int[] hits = {0};
+        allowDamage(helper, List.of(target), (entity, source, amount) -> {
+            hits[0]++;
+            return true;
+        });
         var work = requireNonNull(reserveTerrain(helper, player));
         TechniqueCombat.release(player, UUID.randomUUID(), Technique.CLEAVE, work);
         helper.assertTrue(
@@ -148,11 +149,7 @@ public final class TechniqueImpactGameTest {
                 HEALTH - target.getHealth() > TechniqueTuning.DISMANTLE_DAMAGE, "Contact Cleave must exceed Dismantle");
         helper.startSequence()
                 .thenWaitUntil(() -> helper.assertTrue(work.finished(), "The contact lattice must finish"))
-                .thenExecuteAfter(
-                        SETTLE_TICKS,
-                        () -> helper.assertTrue(
-                                target.getHealth() == HEALTH - TechniqueTuning.CLEAVE_MAX_DAMAGE,
-                                "The initial target is hit once"))
+                .thenExecute(() -> helper.assertTrue(hits[0] == 1, "The initial target receives one damage attempt"))
                 .thenSucceed();
     }
 
@@ -164,19 +161,25 @@ public final class TechniqueImpactGameTest {
                 .forEach(pos -> helper.setBlock(pos, Blocks.STONE));
         var targets = List.of(
                 durableTarget(helper, new BlockPos(12, 10, 15)), durableTarget(helper, new BlockPos(16, 10, 15)));
+        int[] hits = {0};
+        allowDamage(helper, targets, (entity, source, amount) -> {
+            hits[0]++;
+            return true;
+        });
         var work = requireNonNull(reserveTerrain(helper, player));
         TechniqueCombat.release(player, UUID.randomUUID(), Technique.CLEAVE, work);
         helper.assertTrue(
                 targets.stream().allMatch(target -> target.getHealth() == HEALTH), "Damage must wait for excavation");
         helper.startSequence()
                 .thenWaitUntil(() -> helper.assertTrue(work.finished(), "The lattice must finish its terrain work"))
-                .thenExecuteAfter(
-                        SETTLE_TICKS,
-                        () -> helper.assertTrue(
-                                targets.stream()
-                                        .allMatch(target ->
-                                                target.getHealth() == HEALTH - TechniqueTuning.CLEAVE_MAX_DAMAGE),
-                                "Every exposed target must receive one adaptive hit, including behind the former wall"))
+                .thenExecute(() -> {
+                    helper.assertTrue(hits[0] == targets.size(), "Each exposed target receives one damage attempt");
+                    helper.assertTrue(
+                            targets.stream()
+                                    .allMatch(
+                                            target -> target.getHealth() == HEALTH - TechniqueTuning.CLEAVE_MAX_DAMAGE),
+                            "Every exposed target receives adaptive damage behind the former wall");
+                })
                 .thenSucceed();
     }
 

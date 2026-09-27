@@ -20,7 +20,7 @@ python3 -m unittest discover -s art/shrine
 python3 art/shrine/export.py --check
 ```
 
-The exporter preserves face winding and bakes element transforms and directional shading into `src/client/resources/assets/cursed-oath/models/domain/shrine.json`. Resource reload rebuilds the runtime model from this file.
+The exporter preserves face winding, applies element rotations in X/Y/Z order about their origins, and bakes directional shading into `src/client/resources/assets/cursed-oath/models/domain/shrine.json`. Resource reload rebuilds the runtime model from this file.
 
 Use triangles or quads; triangulate larger polygons. Triangles repeat their last vertex to fit the runtime quad format; hidden elements and untextured faces are omitted. Apply group rotation and visibility to elements before export. Invalid materials, non-finite coordinates, degenerate faces, and unapplied group state are rejected.
 

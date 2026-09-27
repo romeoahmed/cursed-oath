@@ -10,9 +10,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.projectile.ProjectileUtil;
-import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.HitResult;
@@ -84,27 +81,7 @@ public final class TechniqueOrb extends TechniqueProjectile {
             discard();
             return;
         }
-        var block = level.clipIncludingBorder(
-                new ClipContext(start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
-        HitResult hit = block;
-        double nearest = Double.POSITIVE_INFINITY;
-        for (var candidate : ProjectileUtil.getManyEntityHitResult(
-                level,
-                this,
-                start,
-                block.getLocation(),
-                new AABB(start, block.getLocation()).inflate(AIM_MARGIN),
-                entity -> entity instanceof LivingEntity living && TechniqueCombat.canAffect(player, living),
-                AIM_MARGIN,
-                ClipContext.Block.COLLIDER,
-                true,
-                true)) {
-            double separation = candidate.getLocation().distanceToSqr(start);
-            if (separation < nearest) {
-                hit = candidate;
-                nearest = separation;
-            }
-        }
+        var hit = TechniqueCombat.contact(this, player, start, end, AIM_MARGIN);
         var barrier = DomainInteractions.contact(player, start, hit.getLocation());
         if (barrier != null) {
             float power = technique() == Technique.BLUE ? TechniqueTuning.BLUE_OUTPUT : TechniqueTuning.RED_DAMAGE;

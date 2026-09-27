@@ -1,4 +1,4 @@
-package io.github.romeoahmed.cursedoath.world;
+package io.github.romeoahmed.cursedoath.geometry;
 
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;

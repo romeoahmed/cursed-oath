@@ -27,7 +27,7 @@ Install **JDK 25** and run from the repository root:
 ./gradlew runClient
 ```
 
-Use `gradlew.bat` on Windows. The wrapper resolves development dependencies. In a world with commands enabled, run:
+Use `gradlew.bat` on Windows. The wrapper resolves development dependencies. Create a disposable world with commands enabled, then run:
 
 ```text
 /cursedoath practice
@@ -53,7 +53,9 @@ Commands require a player with operator permissions:
 
 The wheel keeps the world running. Point or use Tab to preview; left-click or Enter selects, while right-click or the cast key uses the technique. Selection closes the wheel; Escape closes it without changing the selection. Keys can be rebound in Minecraft Options.
 
-After G, attack within three seconds with over 90% attack strength for a 20% Black Flash chance; an attack or empty swing consumes readiness. X does not recall released projectiles. “Hide Lightning Flashes” reduces Shrine slashes, Void's opening flash, and domain-clash brightness. Domain sounds have localized subtitles. See the [combat guide](docs/combat.zh-CN.md) for costs, damage, defenses, and burnout.
+After G, attack within three seconds with over 90% attack strength for a 20% Black Flash chance; an attack or empty swing consumes readiness. X does not recall released projectiles. See the [combat guide](docs/combat.zh-CN.md) for costs, damage, defenses, and burnout.
+
+For reduced flashes, enable Minecraft's “Hide Lightning Flashes” option. It reduces Shrine slashes, Void's opening flash, and domain-clash brightness without changing damage. Domain sounds have localized subtitles.
 
 ## Build and install
 

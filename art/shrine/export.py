@@ -12,6 +12,7 @@ OUTPUT = ROOT / "src/client/resources/assets/cursed-oath/models/domain/shrine.js
 
 
 def transform(point, element):
+    """Rotate X/Y/Z around the element origin, then convert model units to blocks."""
     px, py, pz = point
     ox, oy, oz = element.get("origin", [0, 0, 0])
     x, y, z = px - ox, py - oy, pz - oz
@@ -23,6 +24,7 @@ def transform(point, element):
 
 
 def shaded(rgb, vertices):
+    """Bake directional face light into packed RGB; reject a zero-area leading triangle."""
     a, b, c = vertices[:3]
     u = [y - x for x, y in zip(a, b)]
     v = [y - x for x, y in zip(a, c)]

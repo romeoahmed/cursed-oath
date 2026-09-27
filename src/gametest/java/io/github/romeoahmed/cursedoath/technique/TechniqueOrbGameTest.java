@@ -109,6 +109,11 @@ public final class TechniqueOrbGameTest {
         var target = stationaryTarget(helper, EntityTypes.VILLAGER, TARGET);
         requireNonNull(target.getAttribute(Attributes.MAX_HEALTH)).setBaseValue(HEALTH);
         target.setHealth(HEALTH);
+        int[] hits = {0};
+        allowDamage(helper, List.of(target), (entity, source, amount) -> {
+            hits[0]++;
+            return true;
+        });
         var orb = launchOrb(helper, player, Technique.RED);
         helper.assertTrue(target.getHealth() == HEALTH, "Release must not deal remote damage");
         helper.startSequence()
@@ -123,6 +128,7 @@ public final class TechniqueOrbGameTest {
                     helper.assertTrue(orb.isRemoved(), "Red must be removed after detonation");
                     helper.assertTrue(target.getHealth() < HEALTH, "The core must reach and damage the target");
                 })
+                .thenExecuteAfter(2, () -> helper.assertTrue(hits[0] == 1, "Detonation must commit exactly one hit"))
                 .thenSucceed();
     }
 

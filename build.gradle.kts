@@ -51,7 +51,7 @@ dependencies {
     errorprone("com.uber.nullaway:nullaway:0.14.2")
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    testRuntimeOnly(sourceSets["client"].output)
+    testImplementation(sourceSets["client"].output)
     testImplementation(platform("org.junit:junit-bom:6.1.3"))
 }
 
@@ -76,7 +76,7 @@ tasks.processResources {
 
 tasks.withType<JavaCompile>().configureEach {
     options.release = 25
-    // JOML ships Java 6 class files with Java 8 type annotations.
+    // JOML 1.10.9 embeds newer annotation attributes in version 46 class files.
     options.compilerArgs.addAll(listOf("-Xlint:all,-classfile", "-Werror"))
     options.errorprone {
         error("NullAway", "RequireExplicitNullMarking", "JSpecifyUnrecognizedAnnotationLocation")
@@ -106,6 +106,17 @@ spotless {
     }
 }
 
+tasks.javadoc {
+    source(sourceSets["client"].allJava)
+    classpath += sourceSets["client"].compileClasspath
+    (options as StandardJavadocDocletOptions).apply {
+        memberLevel = JavadocMemberLevel.PRIVATE
+        // Validate existing contracts without requiring boilerplate for every private declaration.
+        addBooleanOption("Xdoclint:all,-missing", true)
+        addBooleanOption("Werror", true)
+    }
+}
+
 tasks.jacocoTestReport {
     dependsOn(tasks.test)
 }
@@ -128,7 +139,7 @@ tasks.jacocoTestCoverageVerification {
 }
 
 tasks.check {
-    dependsOn(tasks.jacocoTestReport, tasks.jacocoTestCoverageVerification)
+    dependsOn(tasks.javadoc, tasks.jacocoTestReport, tasks.jacocoTestCoverageVerification)
 }
 
 java {

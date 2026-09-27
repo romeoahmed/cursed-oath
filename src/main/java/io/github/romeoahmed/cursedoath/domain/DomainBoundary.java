@@ -10,6 +10,10 @@ public final class DomainBoundary {
     private static final double MIN_MOTION = 1.0e-12;
     private static final double SURFACE_EPSILON = 1.0e-6;
 
+    /// Finds the first non-tangent sphere crossing on a segment, entering or leaving the interior.
+    /// A moving segment starting on the surface returns zero; tangency and negligible motion return `null`.
+    ///
+    /// @return segment fraction in `[0, 1]`, or `null` when no crossing occurs
     public static @Nullable Double crossing(Vec3 start, Vec3 end, Vec3 center, double radius) {
         var offset = start.subtract(center);
         var motion = end.subtract(start);
@@ -24,6 +28,7 @@ public final class DomainBoundary {
         return exit > SURFACE_EPSILON && exit <= 1 ? exit : null;
     }
 
+    /// Tests the open interior; points exactly on the sphere are outside.
     public static boolean contains(Vec3 point, Vec3 center, double radius) {
         return point.distanceToSqr(center) < radius * radius;
     }

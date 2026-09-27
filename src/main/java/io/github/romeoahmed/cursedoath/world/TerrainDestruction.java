@@ -1,14 +1,11 @@
 package io.github.romeoahmed.cursedoath.world;
 
 import io.github.romeoahmed.cursedoath.CursedOath;
+import io.github.romeoahmed.cursedoath.geometry.SweptVolume;
 import java.util.ArrayDeque;
-import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.PriorityQueue;
-import java.util.function.Function;
-import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentRegistry;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentType;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -55,7 +52,7 @@ public final class TerrainDestruction {
         private boolean finished;
         private boolean persistent;
         private @Nullable Runnable onComplete;
-        private @Nullable Function<Vec3, Vec3> source;
+        private @Nullable UnaryOperator<Vec3> source;
 
         private Work(ServerPlayer owner) {
             this.owner = owner;
@@ -71,13 +68,16 @@ public final class TerrainDestruction {
             return finished;
         }
 
+        /// Reports an empty queue, including after closure; check [#finished()] before submitting another cut.
         public boolean ready() {
             return positions == null && pending.isEmpty();
         }
 
-        /// Replaces the current completion callback; explicit cancellation discards it.
+        /// Sets a one-shot callback for the next cursor completion, not for the entire pending queue.
+        /// The callback runs on the server thread after that cursor is cleared; cancellation discards it.
+        /// Retain the reservation with [#persistent(boolean)] if the callback will submit another cut.
         ///
-        /// @param action server-thread callback, which may schedule the next cut
+        /// @param action callback replacing any previously registered action
         public void onComplete(Runnable action) {
             onComplete = action;
         }
@@ -93,14 +93,17 @@ public final class TerrainDestruction {
             cuts(volumes, volumes.getFirst().start());
         }
 
+        /// Queues nonempty cutting volumes, ordered from the original attack origin toward the front.
+        /// The first volume supplies the shared direction for ordering and cover rays.
+        ///
+        /// @param volumes cuts in world coordinates
+        /// @param origin original attack center, retained across advancing segments
+        /// @throws IllegalStateException if this work is closed or still has queued positions
         public void cuts(List<SweptVolume> volumes, Vec3 origin) {
             requireReady();
             var first = volumes.getFirst();
-            var bounds = first.bounds();
-            for (int i = 1; i < volumes.size(); i++)
-                bounds = bounds.minmax(volumes.get(i).bounds());
             source = point -> first.source(point, origin);
-            positions = new CutCursor(BlockPos.betweenClosed(bounds).iterator(), List.copyOf(volumes), origin);
+            positions = ExcavationCursors.cuts(volumes, origin);
         }
         /// Queues a piercing segment without sorting or cover rays, excluding previously swept blocks.
         /// Submitted segments survive owner loss and the ordinary reservation timeout.
@@ -114,12 +117,13 @@ public final class TerrainDestruction {
                 throw new IllegalStateException("Terrain segment capacity exceeded");
             released = true;
             persistent = true;
-            pending.addLast(mapPositions(BlockPos.betweenClosed(volume.bounds()).iterator(), pos -> {
-                var box = new AABB(pos);
-                return !box.intersects(clearance)
-                        && volume.entry(box) != null
-                        && (previous == null || previous.entry(box) == null);
-            }));
+            pending.addLast(ExcavationCursors.select(
+                    BlockPos.betweenClosed(volume.bounds()).iterator(), pos -> {
+                        var box = new AABB(pos);
+                        return !box.intersects(clearance)
+                                && volume.entry(box) != null
+                                && (previous == null || previous.entry(box) == null);
+                    }));
         }
 
         /// Lets submitted segments drain before closing; callers must stop submitting new segments.
@@ -132,7 +136,7 @@ public final class TerrainDestruction {
             requireReady();
             source = null;
             int extent = (int) Math.ceil(radius);
-            positions = mapPositions(
+            positions = ExcavationCursors.select(
                     BlockPos.withinBoxByManhattanDistance(BlockPos.containing(center), extent, extent, extent)
                             .iterator(),
                     pos -> new AABB(pos).distanceToSqr(center) < radius * radius);
@@ -147,7 +151,7 @@ public final class TerrainDestruction {
             requireReady();
             source = null;
             int extent = (int) Math.ceil(radius);
-            positions = mapPositions(
+            positions = ExcavationCursors.select(
                     BlockPos.withinBoxByManhattanDistance(BlockPos.containing(center), extent, extent, extent)
                             .iterator(),
                     pos -> pos.getY() >= ground - 1.0e-6 && new AABB(pos).distanceToSqr(center) < radius * radius);
@@ -245,63 +249,6 @@ public final class TerrainDestruction {
             return true;
         }
     }
-    // Each next() accounts for exactly one scan or commit visit, including rejected positions.
-    private static Iterator<@Nullable BlockPos> mapPositions(Iterator<BlockPos> scan, Predicate<BlockPos> accepts) {
-        return new Iterator<>() {
-            @Override
-            public boolean hasNext() {
-                return scan.hasNext();
-            }
-
-            @Override
-            public @Nullable BlockPos next() {
-                var pos = scan.next();
-                return accepts.test(pos) ? pos.immutable() : null;
-            }
-        };
-    }
-
-    private static final class CutCursor implements Iterator<@Nullable BlockPos> {
-        private final Iterator<BlockPos> scan;
-        private final List<SweptVolume> volumes;
-        private final Vec3 origin;
-        private final PriorityQueue<Candidate> candidates =
-                new PriorityQueue<>(Comparator.comparingDouble(Candidate::distance)
-                        .thenComparingLong(value -> value.position().asLong()));
-
-        private CutCursor(Iterator<BlockPos> scan, List<SweptVolume> volumes, Vec3 origin) {
-            this.scan = scan;
-            this.volumes = volumes;
-            this.origin = origin;
-        }
-
-        @Override
-        public boolean hasNext() {
-            return scan.hasNext() || !candidates.isEmpty();
-        }
-
-        @Override
-        public @Nullable BlockPos next() {
-            if (scan.hasNext()) {
-                var pos = scan.next();
-                var box = new AABB(pos);
-                for (var volume : volumes) {
-                    if (volume.entry(box) != null) {
-                        candidates.add(new Candidate(
-                                pos.immutable(),
-                                Vec3.atCenterOf(pos)
-                                        .subtract(origin)
-                                        .dot(volumes.getFirst().forward())));
-                        break;
-                    }
-                }
-                return null;
-            }
-            if (candidates.isEmpty()) throw new NoSuchElementException();
-            return candidates.remove().position();
-        }
-    }
-
     /// Reserves a work slot in the owner's current world. Call on the owning server thread.
     ///
     /// @param owner player used for protection checks and ordinary task lifetime
@@ -318,7 +265,7 @@ public final class TerrainDestruction {
     public static void tick(MinecraftServer server) {
         var queue = server.globalAttachments().getAttached(QUEUE);
         if (queue == null || queue.isEmpty()) return;
-        var event = new TerrainEvent();
+        var event = new ExcavationEvent();
         event.begin();
         var budget = new Budget();
         int idle = 0;
@@ -358,6 +305,4 @@ public final class TerrainDestruction {
             }
         }
     }
-
-    private record Candidate(BlockPos position, double distance) {}
 }

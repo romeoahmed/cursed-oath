@@ -2,23 +2,21 @@ package io.github.romeoahmed.cursedoath.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import io.github.romeoahmed.cursedoath.client.animation.CastingAnimation;
-import io.github.romeoahmed.cursedoath.client.render.limitless.BlueDebris;
 import io.github.romeoahmed.cursedoath.client.render.limitless.EnergyTrails;
 import io.github.romeoahmed.cursedoath.client.render.limitless.LimitlessEffects;
 import io.github.romeoahmed.cursedoath.network.TechniqueEvent;
 import io.github.romeoahmed.cursedoath.technique.Technique;
-import io.github.romeoahmed.cursedoath.technique.TechniqueOrb;
 import io.github.romeoahmed.cursedoath.technique.TechniqueTuning;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLevelEvents;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.RenderStateDataKey;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelExtractionContext;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelExtractionEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -29,7 +27,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 public final class TechniqueVisuals {
-    private static final int MAX_DEBRIS_FIELDS = 8, MAX_EFFECTS = 96, MAX_SEEN = 512, IMPACT_DURATION = 16;
+    private static final int MAX_EFFECTS = 96, MAX_SEEN = 512, IMPACT_DURATION = 16;
     private static final double MAX_DISTANCE_SQUARED = 128.0 * 128.0, EFFECT_SIZE = 32;
 
     private record Effect(TechniqueEvent event, Technique technique, int duration) {}
@@ -39,78 +37,73 @@ public final class TechniqueVisuals {
     private record EventKey(UUID id, int stage) {}
 
     private static final List<Effect> EFFECTS = new ArrayList<>();
-    private static final Set<TechniqueOrb> ORBS = new LinkedHashSet<>();
     private static final LinkedHashSet<EventKey> SEEN = new LinkedHashSet<>();
     private static final RenderStateDataKey<List<Shape>> KEY = RenderStateDataKey.create(() -> "cursed-oath:effects");
 
     private TechniqueVisuals() {}
 
     public static void initialize() {
-        ClientTickEvents.END_CLIENT_TICK.register(TechniqueVisuals::tickDebris);
         ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> clear());
-        ClientEntityEvents.ENTITY_LOAD.register((entity, level) -> {
-            if (entity instanceof TechniqueOrb orb) ORBS.add(orb);
-        });
-        ClientEntityEvents.ENTITY_UNLOAD.register((entity, level) -> {
-            if (entity instanceof TechniqueOrb orb) ORBS.remove(orb);
-        });
-        var renderType = EffectRenderTypes.ADDITIVE;
-        LevelExtractionEvents.END_EXTRACTION.register(context -> {
-            float partial = context.deltaTracker().getGameTimeDeltaPartialTick(false);
-            double time = (double) context.level().getGameTime() + partial;
-            EFFECTS.removeIf(effect -> !effect.event()
-                            .dimension()
-                            .equals(context.level().dimension().identifier())
-                    || time - effect.event().tick() > effect.duration());
-            context.levelState()
-                    .setData(
-                            KEY,
-                            EFFECTS.stream()
-                                    .map(effect -> shape(effect, context.level(), time, partial))
-                                    .toList());
-        });
-        LevelRenderEvents.COLLECT_SUBMITS.register(context -> {
-            var shapes = context.levelState().getData(KEY);
-            if (shapes == null) return;
-            var cameraState = context.levelState().cameraRenderState;
-            var camera = cameraState.pos;
-            for (var shape : shapes) {
-                if (shape.position().distanceToSqr(camera) > MAX_DISTANCE_SQUARED
-                        || !cameraState.cullFrustum.isVisible(
-                                AABB.ofSize(shape.position(), EFFECT_SIZE, EFFECT_SIZE, EFFECT_SIZE))) continue;
-                var pose = context.poseStack();
-                pose.pushPose();
-                pose.translate(
-                        shape.position().x - camera.x, shape.position().y - camera.y, shape.position().z - camera.z);
-                var collector = context.submitNodeCollector();
-                if (shape.stage() == TechniqueEvent.PREPARE)
-                    LimitlessEffects.submit(
-                            pose,
-                            collector,
-                            LimitlessEffects.charge(shape.technique(), shape.progress(), shape.direction()));
-                else {
-                    collector.submitCustomGeometry(
-                            pose,
-                            shape.technique() == Technique.CLEAVE && shape.stage() != TechniqueEvent.BLACK_FLASH
-                                    ? EffectRenderTypes.CORE
-                                    : renderType,
-                            (matrix, vertices) -> {
-                                switch (shape.stage()) {
-                                    case TechniqueEvent.IMPACT ->
-                                        new EnergyTrails(matrix, vertices).impact(shape.progress());
-                                    case TechniqueEvent.BLACK_FLASH ->
-                                        new TechniqueGeometry(new EffectMesh(matrix, vertices))
-                                                .blackFlash(shape.direction(), shape.progress());
-                                    default ->
-                                        new TechniqueGeometry(new EffectMesh(matrix, vertices))
-                                                .draw(shape.technique(), shape.progress(), shape.direction());
-                                }
-                            });
-                    drawCore(pose, collector, shape);
-                }
-                pose.popPose();
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> clear());
+        LevelExtractionEvents.END_EXTRACTION.register(TechniqueVisuals::extract);
+        LevelRenderEvents.COLLECT_SUBMITS.register(TechniqueVisuals::submit);
+    }
+
+    /// Captures live actors once; deferred geometry receives only immutable shapes.
+    private static void extract(LevelExtractionContext context) {
+        float partial = context.deltaTracker().getGameTimeDeltaPartialTick(false);
+        double time = (double) context.level().getGameTime() + partial;
+        EFFECTS.removeIf(effect ->
+                !effect.event().dimension().equals(context.level().dimension().identifier())
+                        || time - effect.event().tick() > effect.duration());
+        context.levelState()
+                .setData(
+                        KEY,
+                        EFFECTS.stream()
+                                .map(effect -> shape(effect, context.level(), time, partial))
+                                .toList());
+    }
+
+    private static void submit(LevelRenderContext context) {
+        var shapes = context.levelState().getData(KEY);
+        if (shapes == null) return;
+        var cameraState = context.levelState().cameraRenderState;
+        var camera = cameraState.pos;
+        for (var shape : shapes) {
+            if (shape.position().distanceToSqr(camera) > MAX_DISTANCE_SQUARED
+                    || !cameraState.cullFrustum.isVisible(
+                            AABB.ofSize(shape.position(), EFFECT_SIZE, EFFECT_SIZE, EFFECT_SIZE))) continue;
+            var pose = context.poseStack();
+            pose.pushPose();
+            pose.translate(shape.position().x - camera.x, shape.position().y - camera.y, shape.position().z - camera.z);
+            var collector = context.submitNodeCollector();
+            if (shape.stage() == TechniqueEvent.PREPARE)
+                LimitlessEffects.submit(
+                        pose,
+                        collector,
+                        LimitlessEffects.charge(shape.technique(), shape.progress(), shape.direction()));
+            else {
+                collector.submitCustomGeometry(
+                        pose,
+                        shape.technique() == Technique.CLEAVE && shape.stage() != TechniqueEvent.BLACK_FLASH
+                                ? EffectRenderTypes.CORE
+                                : EffectRenderTypes.ADDITIVE,
+                        (matrix, vertices) -> {
+                            switch (shape.stage()) {
+                                case TechniqueEvent.IMPACT ->
+                                    new EnergyTrails(matrix, vertices).impact(shape.progress());
+                                case TechniqueEvent.BLACK_FLASH ->
+                                    new CombatEffects(new EffectMesh(matrix, vertices))
+                                            .blackFlash(shape.direction(), shape.progress());
+                                default ->
+                                    new CombatEffects(new EffectMesh(matrix, vertices))
+                                            .draw(shape.technique(), shape.progress(), shape.direction());
+                            }
+                        });
+                drawCore(pose, collector, shape);
             }
-        });
+            pose.popPose();
+        }
     }
 
     private static void drawCore(PoseStack pose, SubmitNodeCollector collector, Shape shape) {
@@ -118,15 +111,8 @@ public final class TechniqueVisuals {
         collector.submitCustomGeometry(
                 pose,
                 EffectRenderTypes.CORE,
-                (matrix, vertices) -> new TechniqueGeometry(new EffectMesh(matrix, vertices, 1, 1, 255))
+                (matrix, vertices) -> new CombatEffects(new EffectMesh(matrix, vertices, 1, 1, 255))
                         .blackFlash(shape.direction(), shape.progress(), true));
-    }
-
-    private static void tickDebris(Minecraft client) {
-        if (client.isPaused()) return;
-        int remaining = MAX_DEBRIS_FIELDS;
-        for (var orb : ORBS)
-            if (orb.technique() == Technique.BLUE && BlueDebris.emit(client, orb.position()) && --remaining == 0) break;
     }
 
     private static Shape shape(Effect effect, ClientLevel level, double time, float partial) {
@@ -201,8 +187,7 @@ public final class TechniqueVisuals {
         EFFECTS.add(new Effect(event, technique, duration));
     }
 
-    public static void clear() {
-        ORBS.clear();
+    private static void clear() {
         EFFECTS.clear();
         SEEN.clear();
     }

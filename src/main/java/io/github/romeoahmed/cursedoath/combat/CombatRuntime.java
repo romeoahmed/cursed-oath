@@ -1,5 +1,6 @@
 package io.github.romeoahmed.cursedoath.combat;
 
+import io.github.romeoahmed.cursedoath.CursedOath;
 import io.github.romeoahmed.cursedoath.domain.Domains;
 import io.github.romeoahmed.cursedoath.network.CastRequest;
 import io.github.romeoahmed.cursedoath.network.CombatSnapshot;
@@ -13,10 +14,11 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import net.fabricmc.fabric.api.attachment.v1.AttachmentRegistry;
+import net.fabricmc.fabric.api.attachment.v1.AttachmentType;
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityLevelChangeEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -25,11 +27,27 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import org.jspecify.annotations.Nullable;
 
+/// Server-thread combat coordination. Each server owns its fighters, connections and last sent snapshots.
 public final class CombatRuntime {
     private static final long SYNC_INTERVAL = 4;
-    private static final IdentityHashMap<ServerLevel, Map<UUID, Fighter>> WORLDS = new IdentityHashMap<>();
-    private static final Map<UUID, RequestGate> CONNECTIONS = new HashMap<>();
-    private static final Map<UUID, CombatSnapshot> SNAPSHOTS = new HashMap<>();
+    private static final AttachmentType<State> STATE =
+            AttachmentRegistry.create(CursedOath.id("combat_runtime"), builder -> builder.initializer(State::new));
+
+    private static final class State {
+        final IdentityHashMap<ServerLevel, Map<UUID, Fighter>> worlds = new IdentityHashMap<>();
+        final Map<UUID, Connection> connections = new HashMap<>();
+    }
+
+    private static final class Connection {
+        final RequestGate gate = new RequestGate();
+
+        @Nullable
+        CombatSnapshot snapshot;
+    }
+
+    private static State state(ServerLevel level) {
+        return level.globalAttachments().getAttachedOrCreate(STATE);
+    }
 
     private CombatRuntime() {}
 
@@ -41,12 +59,12 @@ public final class CombatRuntime {
         ServerPlayNetworking.registerGlobalReceiver(
                 CastRequest.TYPE, (request, context) -> request(context.player(), request));
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-            CONNECTIONS.put(handler.player.getUUID(), new RequestGate());
+            state(handler.player.level()).connections.put(handler.player.getUUID(), new Connection());
             sync(fighter(handler.player));
         });
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             remove(handler.player);
-            CONNECTIONS.remove(handler.player.getUUID());
+            state(handler.player.level()).connections.remove(handler.player.getUUID());
         });
         ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
             if (entity instanceof ServerPlayer player) remove(player);
@@ -61,36 +79,28 @@ public final class CombatRuntime {
                 }
             }
         });
-        ServerPlayerEvents.AFTER_RESPAWN.register((old, player, alive) -> {
-            SNAPSHOTS.remove(player.getUUID());
-            sync(fighter(player));
-        });
-        ServerEntityLevelChangeEvents.AFTER_PLAYER_CHANGE_LEVEL.register((player, old, next) -> {
-            SNAPSHOTS.remove(player.getUUID());
-            sync(fighter(player));
-        });
+        ServerPlayerEvents.AFTER_RESPAWN.register((old, player, alive) -> resync(player));
+        ServerEntityLevelChangeEvents.AFTER_PLAYER_CHANGE_LEVEL.register((player, old, next) -> resync(player));
         ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
             var attacker = source.getEntity();
             return (attacker == null || !Domains.isOverloaded(attacker))
                     && (!(entity instanceof ServerPlayer player) || !InfinityDefense.blocks(player, source));
         });
         ServerTickEvents.END_LEVEL_TICK.register(CombatRuntime::tick);
-        ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
-            WORLDS.clear();
-            CONNECTIONS.clear();
-            SNAPSHOTS.clear();
-        });
     }
 
+    /// Gets or creates state for this live player in its current world, retiring any previous owner of the UUID.
+    /// Retirement cancels active casts and domains; saved costs, recovery and burnout remain on the player.
     @SuppressWarnings("ReferenceEquality") // Live world/player instances define ownership across transfers.
     public static Fighter fighter(ServerPlayer player) {
+        var worlds = state(player.level()).worlds;
         // A dimension transfer may retain the same player instance; retire its old world state first.
-        for (var entry : WORLDS.entrySet())
+        for (var entry : worlds.entrySet())
             if (entry.getKey() != player.level()) {
                 var old = entry.getValue().remove(player.getUUID());
                 if (old != null) old.cancel();
             }
-        var fighters = WORLDS.computeIfAbsent(player.level(), ignored -> new HashMap<>());
+        var fighters = worlds.computeIfAbsent(player.level(), ignored -> new HashMap<>());
         var previous = fighters.get(player.getUUID());
         if (previous != null && previous.player() == player) return previous;
         if (previous != null) previous.cancel();
@@ -108,9 +118,11 @@ public final class CombatRuntime {
         sync(fighter(player));
     }
 
+    @SuppressWarnings("ReferenceEquality") // A retired player cannot borrow the replacement's defenses.
     private static @Nullable Fighter existing(ServerPlayer player) {
-        var fighters = WORLDS.get(player.level());
-        return fighters == null ? null : fighters.get(player.getUUID());
+        var fighters = state(player.level()).worlds.get(player.level());
+        var fighter = fighters == null ? null : fighters.get(player.getUUID());
+        return fighter != null && fighter.player() == player ? fighter : null;
     }
 
     public static boolean hasInfinity(ServerPlayer player) {
@@ -131,15 +143,17 @@ public final class CombatRuntime {
                 && !player.isSpectator();
     }
 
+    /// Returns a live collection for server-thread queries; callers must not mutate it.
+    /// Copy before combat callbacks, which may remove or replace fighters.
     public static Collection<Fighter> fighters(ServerLevel level) {
-        var fighters = WORLDS.get(level);
+        var fighters = state(level).worlds.get(level);
         return fighters == null ? List.of() : fighters.values();
     }
 
     private static void request(ServerPlayer player, CastRequest request) {
-        var gate = CONNECTIONS.get(player.getUUID());
-        if (gate == null
-                || !gate.accept(
+        var connection = state(player.level()).connections.get(player.getUUID());
+        if (connection == null
+                || !connection.gate.accept(
                         request.session(), request.sequence(), player.level().getGameTime())) return;
         var fighter = fighter(player);
         var profile = player.getAttachedOrCreate(SorcererAttachments.PROFILE);
@@ -157,7 +171,7 @@ public final class CombatRuntime {
 
     @SuppressWarnings("ReferenceEquality") // Replaced or transferred instances must not keep ticking.
     private static void tick(ServerLevel level) {
-        var fighters = WORLDS.get(level);
+        var fighters = state(level).worlds.get(level);
         if (fighters == null) return;
         // Released hits can synchronously remove fighters through AFTER_DEATH.
         for (var fighter : List.copyOf(fighters.values())) {
@@ -178,21 +192,33 @@ public final class CombatRuntime {
         return fighter != null && fighter.consumePulse();
     }
 
+    @SuppressWarnings("ReferenceEquality") // Late callbacks from an old entity must not retire its replacement.
     private static void remove(ServerPlayer player) {
-        SNAPSHOTS.remove(player.getUUID());
-        for (var fighters : WORLDS.values()) {
-            var fighter = fighters.remove(player.getUUID());
-            if (fighter != null) fighter.cancel();
+        var state = state(player.level());
+        var connection = state.connections.get(player.getUUID());
+        if (connection != null) connection.snapshot = null;
+        for (var fighters : state.worlds.values()) {
+            var fighter = fighters.get(player.getUUID());
+            if (fighter != null && fighter.player() == player) {
+                fighters.remove(player.getUUID());
+                fighter.cancel();
+            }
         }
+    }
+
+    private static void resync(ServerPlayer player) {
+        var connection = state(player.level()).connections.get(player.getUUID());
+        if (connection != null) connection.snapshot = null;
+        sync(fighter(player));
     }
 
     private static void sync(Fighter fighter) {
         var player = fighter.player();
-        var gate = CONNECTIONS.get(player.getUUID());
-        if (gate == null || !ServerPlayNetworking.canSend(player, CombatSnapshot.TYPE)) return;
+        var connection = state(player.level()).connections.get(player.getUUID());
+        if (connection == null || !ServerPlayNetworking.canSend(player, CombatSnapshot.TYPE)) return;
         var cast = fighter.cast();
         var snapshot = new CombatSnapshot(
-                gate.session(),
+                connection.gate.session(),
                 player.getAttachedOrCreate(SorcererAttachments.PROFILE).practice(),
                 fighter.energy().current(),
                 fighter.energy().reserved(),
@@ -203,6 +229,9 @@ public final class CombatRuntime {
                 Domains.ownedBy(player) == null ? fighter.burnout() : 0,
                 fighter.defense().simple(),
                 fighter.defense().amplification());
-        if (!snapshot.equals(SNAPSHOTS.put(player.getUUID(), snapshot))) ServerPlayNetworking.send(player, snapshot);
+        if (!snapshot.equals(connection.snapshot)) {
+            connection.snapshot = snapshot;
+            ServerPlayNetworking.send(player, snapshot);
+        }
     }
 }

@@ -7,6 +7,7 @@ import io.github.romeoahmed.cursedoath.client.render.TechniqueProjectileRenderer
 import io.github.romeoahmed.cursedoath.client.render.TechniqueVisuals;
 import io.github.romeoahmed.cursedoath.client.render.domain.BarrierRenderer;
 import io.github.romeoahmed.cursedoath.client.render.domain.DomainRenderer;
+import io.github.romeoahmed.cursedoath.client.render.limitless.BlueDebris;
 import io.github.romeoahmed.cursedoath.client.sound.DomainAudio;
 import io.github.romeoahmed.cursedoath.domain.DomainEntity;
 import io.github.romeoahmed.cursedoath.domain.DomainIndex;
@@ -28,6 +29,7 @@ public final class CursedOathClient implements ClientModInitializer {
         CastingAnimation.initialize();
         CombatInput.initialize();
         TechniqueVisuals.initialize();
+        BlueDebris.initialize();
         CombatHud.initialize();
         BarrierRenderer.initialize();
         DomainAudio.initialize();

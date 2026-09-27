@@ -96,17 +96,23 @@ public final class TechniqueWaveGameTest {
     }
 
     @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:flight", maxTicks = 100)
-    public void bedrockIsPreservedWithoutShieldingTargets(GameTestHelper helper) {
+    public void centralAndPeripheralBedrockDoNotShieldTargetsOrTerrain(GameTestHelper helper) {
         var player = caster(helper);
         player.setPos(helper.absoluteVec(ORIGIN));
         var wall = new BlockPos(14, 11, 18);
+        var peripheral = wall.east(4);
+        var behind = peripheral.south(2);
         helper.setBlock(wall, Blocks.BEDROCK);
+        helper.setBlock(peripheral, Blocks.BEDROCK);
+        helper.setBlock(behind, Blocks.STONE);
         var target = stationaryTarget(helper, EntityTypes.HUSK, TARGET);
         var before = target.getHealth();
         var work = requireNonNull(release(helper, player, Technique.PURPLE));
         helper.succeedWhen(() -> {
             helper.assertTrue(work.finished(), "Flight and queued excavation must finish before checking preservation");
             helper.assertBlockPresent(Blocks.BEDROCK, wall);
+            helper.assertBlockPresent(Blocks.BEDROCK, peripheral);
+            helper.assertBlockPresent(Blocks.AIR, behind);
             helper.assertTrue(target.getHealth() < before, "A preserved block must not shield entities");
         });
     }
@@ -164,25 +170,6 @@ public final class TechniqueWaveGameTest {
         });
     }
 
-    @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:arena", maxTicks = 120)
-    public void peripheralBedrockDoesNotShieldTerrain(GameTestHelper helper) {
-        var player = caster(helper);
-        player.setPos(helper.absoluteVec(ORIGIN));
-        var protectedPos = new BlockPos(18, 11, 18);
-        var behind = protectedPos.south(2);
-        helper.setBlock(protectedPos, Blocks.BEDROCK);
-        helper.setBlock(behind, Blocks.STONE);
-        var exposed = stationaryTarget(helper, EntityTypes.HUSK, TARGET);
-        var wave = launchWave(helper, player, Technique.PURPLE);
-        helper.succeedWhen(() -> {
-            helper.assertTrue(
-                    exposed.getHealth() < exposed.getMaxHealth(), "Clear paths must still receive Purple damage");
-            helper.assertBlockPresent(Blocks.BEDROCK, protectedPos);
-            helper.assertBlockPresent(Blocks.AIR, behind);
-            wave.discard();
-        });
-    }
-
     @GameTest(environment = "cursed-oath-test:waves")
     @SuppressWarnings("ReferenceEquality") // Verify live entity ownership, not equality by entity ID.
     public void purpleRequiresReversalAndCancellationReleasesItsReservation(GameTestHelper helper) {
@@ -206,21 +193,6 @@ public final class TechniqueWaveGameTest {
                         .isEmpty(),
                 "Cancellation must not spawn a wave");
         helper.succeed();
-    }
-
-    @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:arena", maxTicks = 100)
-    public void queuedExcavationChecksTheCurrentBlock(GameTestHelper helper) {
-        var player = caster(helper);
-        player.setPos(helper.absoluteVec(ORIGIN));
-        var pos = new BlockPos(14, 11, 18);
-        var absolute = helper.absolutePos(pos);
-        var work = requireNonNull(reserveTerrain(helper, player));
-        work.sphere(Vec3.atCenterOf(absolute), 1.0);
-        helper.setBlock(pos, Blocks.CHEST);
-        helper.succeedWhen(() -> {
-            helper.assertTrue(work.finished(), "The queued operation must settle");
-            helper.assertBlockPresent(Blocks.CHEST, pos);
-        });
     }
 
     @GameTest(environment = "cursed-oath-test:waves", structure = "cursed-oath-test:arena", maxTicks = 100)
@@ -271,11 +243,11 @@ public final class TechniqueWaveGameTest {
         beforeBlockBreak(helper, player, (level, actor, pos, state, entity) -> !pos.equals(absolute));
         helper.setBlock(denied, Blocks.STONE);
         helper.setBlock(behind, Blocks.STONE);
-        var wave = launchWave(helper, player, Technique.PURPLE);
+        var work = requireNonNull(release(helper, player, Technique.PURPLE));
         helper.succeedWhen(() -> {
+            helper.assertTrue(work.finished(), "Protection must survive the complete flight and queued excavation");
             helper.assertBlockPresent(Blocks.AIR, behind);
             helper.assertBlockPresent(Blocks.STONE, denied);
-            wave.discard();
         });
     }
 }

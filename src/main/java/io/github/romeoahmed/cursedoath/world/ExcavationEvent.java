@@ -10,7 +10,7 @@ import jdk.jfr.StackTrace;
 @Label("Terrain excavation")
 @Category("Cursed Oath")
 @StackTrace(false)
-final class TerrainEvent extends Event {
+final class ExcavationEvent extends Event {
     public int visits;
     public int blocks;
     public int pending;

@@ -50,7 +50,6 @@ public final class CombatInput {
             snapshot = null;
             sequence = 0;
             selected = Technique.BLUE;
-            TechniqueVisuals.clear();
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (WHEEL.consumeClick()) if (active(client)) client.gui.setScreen(new TechniqueWheelScreen());

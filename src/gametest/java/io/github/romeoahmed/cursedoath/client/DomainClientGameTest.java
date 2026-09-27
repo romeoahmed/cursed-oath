@@ -28,6 +28,9 @@ public final class DomainClientGameTest implements FabricClientGameTest {
     @Override
     public void runTest(ClientGameTestContext context) {
         prepareScreenshots(context);
+        boolean hidden = context.computeOnClient(client -> client.gui.hud.isHidden());
+        boolean subdued = context.computeOnClient(
+                client -> client.options.hideLightningFlash().get());
         try (var world = context.worldBuilder().create()) {
             for (var command : List.of(
                     "time set noon",
@@ -46,11 +49,17 @@ public final class DomainClientGameTest implements FabricClientGameTest {
             world.getConnection().waitForChunksRender();
             context.waitFor(client ->
                     CombatInput.snapshot() != null && CombatInput.snapshot().enabled());
-            context.getInput().pressKey(options -> options.keyToggleGui);
+            context.runOnClient(client -> client.options.hideLightningFlash().set(false));
+            if (!hidden) context.getInput().pressKey(options -> options.keyToggleGui);
             verifyVoid(context, world);
             verifyShrine(context, world);
             verifyBarriers(context, world);
             verifyClash(context, world);
+        } finally {
+            context.runOnClient(client -> {
+                if (client.gui.hud.isHidden() != hidden) client.gui.hud.toggle();
+                client.options.hideLightningFlash().set(subdued);
+            });
         }
     }
 

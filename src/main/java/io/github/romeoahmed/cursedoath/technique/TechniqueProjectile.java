@@ -29,6 +29,8 @@ public abstract sealed class TechniqueProjectile extends Projectile permits Tech
         return value == null ? Technique.PURPLE : value;
     }
 
+    /// Returns the fixed world-space muzzle position, synchronized even to observers who start tracking late.
+    /// Renderers measure flight growth from this point rather than from entity age.
     public final Vec3 launchPosition() {
         return entityData.get(LAUNCH_POSITION);
     }

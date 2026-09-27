@@ -49,14 +49,14 @@ final class DomainEffects {
                 && !suppressed(domain, target, domains);
     }
 
-    static void tick(DomainEntity domain, List<DomainEntity> domains, Set<LivingEntity> affected) {
+    static void tick(
+            DomainEntity domain, List<DomainEntity> domains, Set<LivingEntity> affected, DomainProtection protection) {
         var level = (ServerLevel) domain.level();
         var targets = level.getEntitiesOfClass(LivingEntity.class, domain.bounds());
         for (var target : targets) {
             // Damage callbacks can collapse the domain or invalidate its caster between targets.
             if (domain.isRemoved() || !domain.valid()) return;
-            if (canHit(domain, target, domains) && !DomainProtection.protects(target, true))
-                apply(domain, target, affected);
+            if (canHit(domain, target, domains) && !protection.intercept(target)) apply(domain, target, affected);
         }
         if (!domain.isRemoved() && domain.valid() && domain.technique() == Technique.MALEVOLENT_SHRINE)
             excavate(domain);

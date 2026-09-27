@@ -3,6 +3,7 @@ package io.github.romeoahmed.cursedoath.client.render;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.renderpearl.api.pipeline.BlendFunction;
 import com.mojang.renderpearl.api.pipeline.ColorTargetState;
+import com.mojang.renderpearl.api.pipeline.CompareOp;
 import com.mojang.renderpearl.api.pipeline.DepthStencilState;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import io.github.romeoahmed.cursedoath.CursedOath;
@@ -21,6 +22,8 @@ public final class EffectRenderTypes {
     private static final RenderPipeline PIPELINE = RenderPipelines.register(RenderPipeline.builder(SURFACE)
             .withLocation(CursedOath.id("pipeline/technique"))
             .withColorTargetState(new ColorTargetState(BlendFunction.LIGHTNING))
+            // Transparent terrain follows this pass; even zero-alpha glow must not occlude it.
+            .withDepthStencilState(new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, false))
             .build());
     private static final OitPipelineSet OIT = RenderPipelines.register(OitPipelineSet.builder(
                     "technique", RenderPipeline.builder(SURFACE).withShaderDefine("OIT_ADDITIVE"))

@@ -1,6 +1,6 @@
 package io.github.romeoahmed.cursedoath.domain;
 
-import io.github.romeoahmed.cursedoath.world.SweptVolume;
+import io.github.romeoahmed.cursedoath.geometry.SweptVolume;
 import java.util.Set;
 import java.util.UUID;
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;

@@ -1,4 +1,4 @@
-package io.github.romeoahmed.cursedoath.world;
+package io.github.romeoahmed.cursedoath.geometry;
 
 import java.util.Arrays;
 import net.minecraft.core.Direction;

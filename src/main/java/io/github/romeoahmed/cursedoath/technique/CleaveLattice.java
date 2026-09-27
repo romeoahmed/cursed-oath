@@ -1,8 +1,8 @@
 package io.github.romeoahmed.cursedoath.technique;
 
-import io.github.romeoahmed.cursedoath.world.SweptVolume;
-import java.util.ArrayList;
+import io.github.romeoahmed.cursedoath.geometry.SweptVolume;
 import java.util.List;
+import java.util.stream.IntStream;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -18,31 +18,22 @@ public final class CleaveLattice {
         var reference = Math.abs(forward.y) < 0.99 ? new Vec3(0, 1, 0) : new Vec3(0, 0, 1);
         var side = forward.cross(reference).normalize();
         var up = side.cross(forward).normalize();
-        var planes = new ArrayList<SweptVolume>();
-        for (int line = -TechniqueTuning.CLEAVE_GRID; line <= TechniqueTuning.CLEAVE_GRID; line++) {
-            double offset = line * TechniqueTuning.CLEAVE_SPACING;
-            var a = center.add(side.scale(offset));
-            var b = center.add(up.scale(offset));
-            var motion = forward.scale(TechniqueTuning.CLEAVE_EXTENT);
-            planes.add(new SweptVolume(
-                    a,
-                    a.add(motion),
-                    new Vec3(
-                            TechniqueTuning.CLEAVE_THICKNESS,
-                            TechniqueTuning.CLEAVE_EXTENT,
-                            TechniqueTuning.CLEAVE_THICKNESS)));
-            planes.add(new SweptVolume(
-                    b,
-                    b.add(motion),
-                    new Vec3(
-                            TechniqueTuning.CLEAVE_EXTENT,
-                            TechniqueTuning.CLEAVE_THICKNESS,
-                            TechniqueTuning.CLEAVE_THICKNESS)));
-        }
-        cuts = List.copyOf(planes);
-        var box = cuts.getFirst().bounds();
-        for (int i = 1; i < cuts.size(); i++) box = box.minmax(cuts.get(i).bounds());
-        bounds = box;
+        var motion = forward.scale(TechniqueTuning.CLEAVE_EXTENT);
+        var vertical = new Vec3(
+                TechniqueTuning.CLEAVE_THICKNESS, TechniqueTuning.CLEAVE_EXTENT, TechniqueTuning.CLEAVE_THICKNESS);
+        var horizontal = new Vec3(
+                TechniqueTuning.CLEAVE_EXTENT, TechniqueTuning.CLEAVE_THICKNESS, TechniqueTuning.CLEAVE_THICKNESS);
+        cuts = IntStream.rangeClosed(-TechniqueTuning.CLEAVE_GRID, TechniqueTuning.CLEAVE_GRID)
+                .boxed()
+                .<SweptVolume>mapMulti((line, emit) -> {
+                    double offset = line * TechniqueTuning.CLEAVE_SPACING;
+                    var a = center.add(side.scale(offset));
+                    var b = center.add(up.scale(offset));
+                    emit.accept(new SweptVolume(a, a.add(motion), vertical));
+                    emit.accept(new SweptVolume(b, b.add(motion), horizontal));
+                })
+                .toList();
+        bounds = cuts.stream().map(SweptVolume::bounds).reduce(AABB::minmax).orElseThrow();
     }
 
     public Vec3 center() {

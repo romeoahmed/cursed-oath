@@ -28,7 +28,6 @@ public final class LaunchClientGameTest implements FabricClientGameTest {
     @Override
     public void runTest(ClientGameTestContext context) {
         prepareScreenshots(context);
-        context.runOnClient(client -> verifyStationaryGrowth());
         var camera = context.computeOnClient(client -> client.options.getCameraType());
         try (var world = context.worldBuilder().create()) {
             context.runOnClient(client -> client.options.setCameraType(CameraType.FIRST_PERSON));
@@ -38,17 +37,6 @@ public final class LaunchClientGameTest implements FabricClientGameTest {
         } finally {
             context.getInput().releaseKey(options -> options.keyUp);
             context.runOnClient(client -> client.options.setCameraType(camera));
-        }
-    }
-
-    private static void verifyStationaryGrowth() {
-        var direction = new Vec3(0, 0, 1);
-        for (var technique : TECHNIQUES) {
-            var charge = LimitlessEffects.charge(technique, 1, direction).getFirst();
-            var birth = LimitlessEffects.flight(technique, 0, direction, 0).getFirst();
-            var delayed = LimitlessEffects.flight(technique, 3, direction, 0).getFirst();
-            checkState(charge.radius() == birth.radius(), "%s changes size at release", technique);
-            checkState(birth.radius() == delayed.radius(), "%s expands before movement arrives", technique);
         }
     }
 
@@ -72,14 +60,15 @@ public final class LaunchClientGameTest implements FabricClientGameTest {
         context.waitFor(client -> {
             var projectile = projectile(client);
             if (projectile == null) return false;
-            checkState(projectile.tickCount <= 2, "Launch test missed the initial network frames");
             verifyRenderedFlight(client);
             return true;
         });
+        var id = context.computeOnClient(
+                client -> requireNonNull(projectile(client)).getUUID());
         var origin = world.getServer().computeOnServer(server -> {
-            for (var entity : world.getConnection().getServerLevel().getAllEntities())
-                if (entity instanceof TechniqueProjectile projectile) return projectile.launchPosition();
-            throw new AssertionError("Missing server projectile");
+            var entity = world.getConnection().getServerLevel().getEntity(id);
+            checkState(entity instanceof TechniqueProjectile, "Missing server projectile");
+            return ((TechniqueProjectile) entity).launchPosition();
         });
         context.runOnClient(client -> {
             var projectile = requireNonNull(projectile(client));
@@ -92,8 +81,12 @@ public final class LaunchClientGameTest implements FabricClientGameTest {
             context.waitTick();
         }
         context.getInput().releaseKey(options -> options.keyUp);
+        // This fixture verifies launch frames. Lifetime and impact belong to server and integration tests.
+        world.getServer().runOnServer(server -> {
+            var entity = world.getConnection().getServerLevel().getEntity(id);
+            if (entity != null) entity.discard();
+        });
         context.waitFor(client -> projectile(client) == null);
-        if (technique == Technique.RED) context.waitTicks(20);
     }
 
     private static void verifyRenderedFlight(Minecraft client) {

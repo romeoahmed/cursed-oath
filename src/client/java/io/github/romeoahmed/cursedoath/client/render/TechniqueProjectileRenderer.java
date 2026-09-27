@@ -81,13 +81,13 @@ public final class TechniqueProjectileRenderer<T extends TechniqueProjectile>
         else {
             var technique = state.technique;
             var direction = state.direction;
-            int detail = TechniqueGeometry.detail(state.distanceToCameraSq);
+            int detail = CombatEffects.detail(state.distanceToCameraSq);
             float opacity = (float)
                     Math.clamp((Math.sqrt(state.distanceToCameraSq) - NEAR_DISTANCE) / FADE_DISTANCE, MIN_OPACITY, 1);
             collector.submitCustomGeometry(
                     poseStack,
                     EffectRenderTypes.CORE,
-                    (pose, vertices) -> new TechniqueGeometry(new EffectMesh(pose, vertices, opacity, detail))
+                    (pose, vertices) -> new CombatEffects(new EffectMesh(pose, vertices, opacity, detail))
                             .draw(technique, 0, direction));
         }
         super.submit(state, poseStack, collector, camera);

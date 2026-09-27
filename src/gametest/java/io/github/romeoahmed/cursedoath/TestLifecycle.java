@@ -2,9 +2,7 @@ package io.github.romeoahmed.cursedoath;
 
 import io.github.romeoahmed.cursedoath.mixin.GameTestHelperAccessor;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.IdentityHashMap;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -42,9 +40,9 @@ public final class TestLifecycle {
 
     public static void beforeBlockBreak(
             GameTestHelper helper, ServerPlayer player, PlayerBlockBreakEvents.Before callback) {
-        var id = player.getUUID();
-        Callbacks.BLOCKS.put(id, callback);
-        onFinish(helper, () -> Callbacks.BLOCKS.remove(id));
+        if (Callbacks.BLOCKS.putIfAbsent(player, callback) != null)
+            throw new IllegalStateException("Block callback already registered for fixture player");
+        onFinish(helper, () -> Callbacks.BLOCKS.remove(player));
     }
 
     public static void allowDamage(
@@ -52,24 +50,26 @@ public final class TestLifecycle {
             Collection<? extends LivingEntity> targets,
             ServerLivingEntityEvents.AllowDamage callback) {
         for (var target : targets) {
-            var id = target.getUUID();
-            if (Callbacks.DAMAGE.putIfAbsent(id, callback) != null)
-                throw new IllegalStateException("Damage callback already registered for fixture target " + id);
-            onFinish(helper, () -> Callbacks.DAMAGE.remove(id));
+            if (Callbacks.DAMAGE.putIfAbsent(target, callback) != null)
+                throw new IllegalStateException("Damage callback already registered for fixture target");
+            onFinish(helper, () -> Callbacks.DAMAGE.remove(target));
         }
     }
+    // Identity isolates replacements that share a UUID.
     // Register once: Fabric events cannot unregister listeners, but fixture callbacks must be removed.
     private static final class Callbacks {
-        private static final Map<UUID, PlayerBlockBreakEvents.Before> BLOCKS = new HashMap<>();
-        private static final Map<UUID, ServerLivingEntityEvents.AllowDamage> DAMAGE = new HashMap<>();
+        private static final IdentityHashMap<ServerPlayer, PlayerBlockBreakEvents.Before> BLOCKS =
+                new IdentityHashMap<>();
+        private static final IdentityHashMap<LivingEntity, ServerLivingEntityEvents.AllowDamage> DAMAGE =
+                new IdentityHashMap<>();
 
         static {
             PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, entity) -> {
-                var callback = BLOCKS.get(player.getUUID());
+                var callback = BLOCKS.get(player);
                 return callback == null || callback.beforeBlockBreak(level, player, pos, state, entity);
             });
             ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
-                var callback = DAMAGE.get(entity.getUUID());
+                var callback = DAMAGE.get(entity);
                 return callback == null || callback.allowDamage(entity, source, amount);
             });
         }

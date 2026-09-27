@@ -17,11 +17,10 @@ public final class LimitlessEffects {
     private static final double BLUE_CHARGE = 0.6;
     private static final double RED_RADIUS = 0.18;
     private static final double FUSION_RADIUS = 0.45;
-    private static final double MERGED_RADIUS = 0.65;
-    private static final double RELEASE_RADIUS = 1.6;
-    private static final float MERGE_DURATION = 0.12f;
+    private static final double RELEASE_RADIUS = 1.0;
+    private static final float FUSION_HOLD = 0.16f, OVERLAP_END = 0.76f;
     private static final double BLUE_GROWTH_DISTANCE = 4;
-    private static final double PURPLE_GROWTH_DISTANCE = TechniqueTuning.PURPLE_SPEED * 4;
+    private static final double PURPLE_GROWTH_DISTANCE = TechniqueTuning.PURPLE_SPEED * 6;
     private static final double SEPARATION = 2.2;
     private static final double CHARGE_START = 0.4;
     private static final double CHARGE_GROWTH = 0.6;
@@ -29,10 +28,18 @@ public final class LimitlessEffects {
 
     private LimitlessEffects() {}
 
+    /// Render snapshot in effect-local block coordinates; `direction` is a unit vector or zero.
+    /// `age` counts interpolated ticks from preparation, while trail and accent strengths range from zero to one.
     public record Form(
-            Technique technique, Vec3 center, Vec3 direction, double radius, float age, boolean flying, float fusion) {
+            Technique technique,
+            Vec3 center,
+            Vec3 direction,
+            double radius,
+            float age,
+            float trailStrength,
+            float accentStrength) {
         public Form(Technique technique, Vec3 center, Vec3 direction, double radius, float age) {
-            this(technique, center, direction, radius, age, false, 0);
+            this(technique, center, direction, radius, age, 0, 1);
         }
     }
 
@@ -45,23 +52,17 @@ public final class LimitlessEffects {
     }
 
     private static List<Form> fusion(float progress, Vec3 direction, float age) {
-        float contact = TechniqueTuning.FUSION_CONTACT, merging = smooth((progress - contact) / MERGE_DURATION);
-        if (progress < contact + MERGE_DURATION) {
-            float approach = smooth(progress / contact);
-            double separation = (SEPARATION + (FUSION_RADIUS - SEPARATION) * approach) * (1 - merging);
+        if (progress < OVERLAP_END) {
+            // One curve crosses contact without stopping; overlap color follows the actual shared volume.
+            double separation = SEPARATION * (1 - smooth((progress - FUSION_HOLD) / (OVERLAP_END - FUSION_HOLD)));
             var offset = EffectMesh.basis(direction).side().scale(separation);
-            double radius = FUSION_RADIUS + (MERGED_RADIUS - FUSION_RADIUS) * merging;
             return List.of(
-                    new Form(Technique.BLUE, offset, direction, radius, age, false, merging),
-                    new Form(Technique.RED, offset.reverse(), direction, radius, age, false, merging));
+                    new Form(Technique.BLUE, offset, direction, FUSION_RADIUS, age, 0, 0),
+                    new Form(Technique.RED, offset.reverse(), direction, FUSION_RADIUS, age, 0, 0));
         }
-        float growth = smooth((progress - contact - MERGE_DURATION) / (1 - contact - MERGE_DURATION));
-        return List.of(new Form(
-                Technique.PURPLE,
-                Vec3.ZERO,
-                direction,
-                MERGED_RADIUS + (RELEASE_RADIUS - MERGED_RADIUS) * growth,
-                age));
+        float growth = smooth((progress - OVERLAP_END) / (1 - OVERLAP_END));
+        double radius = FUSION_RADIUS + (RELEASE_RADIUS - FUSION_RADIUS) * growth;
+        return List.of(new Form(Technique.PURPLE, Vec3.ZERO, direction, radius, age, 0, growth));
     }
 
     public static List<Form> flight(Technique technique, float age, Vec3 direction, double traveled) {
@@ -82,14 +83,21 @@ public final class LimitlessEffects {
         }
         // Movement interpolation can lag behind age; only traveled distance may expand the body.
         float visualAge = age + technique.preparation();
-        return List.of(new Form(technique, Vec3.ZERO, direction, radius, visualAge, true, 0));
+        return List.of(new Form(
+                technique,
+                Vec3.ZERO,
+                direction,
+                radius,
+                visualAge,
+                smooth((float) (traveled / PURPLE_GROWTH_DISTANCE)),
+                1));
     }
 
     public static void submit(PoseStack pose, SubmitNodeCollector collector, List<Form> forms) {
         if (forms.isEmpty()) return;
         collector.submitCustomGeometry(pose, EffectRenderTypes.SOLID, (matrix, vertices) -> {
             var surface = new EnergySurface(matrix, vertices);
-            for (var form : forms) surface.draw(form);
+            surface.draw(forms);
         });
         collector.submitCustomGeometry(pose, EffectRenderTypes.ADDITIVE, (matrix, vertices) -> {
             var trails = new EnergyTrails(matrix, vertices);

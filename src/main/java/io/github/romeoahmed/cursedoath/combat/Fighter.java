@@ -170,6 +170,7 @@ public final class Fighter {
         return ready;
     }
 
+    /// Advances one game tick on the owning server thread; release may synchronously invoke damage callbacks.
     public void tick() {
         if (!player.isAlive() || player.isSpectator()) {
             cancel();
@@ -212,6 +213,8 @@ public final class Fighter {
         persist();
     }
 
+    /// Stops preparation, defenses and the owned domain, releasing reservations without refunding paid energy.
+    /// Recovery and burnout remain persistent obligations; repeated cancellation is safe.
     public void cancel() {
         cancelPreparation();
         defense.clear();

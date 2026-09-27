@@ -5,6 +5,7 @@ import io.github.romeoahmed.cursedoath.domain.Domains;
 import io.github.romeoahmed.cursedoath.network.TechniqueEvent;
 import io.github.romeoahmed.cursedoath.world.LoadedChunks;
 import io.github.romeoahmed.cursedoath.world.TerrainDestruction;
+import java.util.Comparator;
 import java.util.Objects;
 import java.util.UUID;
 import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
@@ -13,6 +14,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.level.ClipContext;
@@ -137,34 +139,45 @@ public final class TechniqueCombat {
         return player.isAlive() && !player.isRemoved() && !player.isSpectator() && player.level() == level;
     }
 
+    /// Traces from the player's eyes without loading chunks.
+    ///
+    /// @param range reach in blocks
+    /// @return nearest contact or a native miss; `null` if any chunk in the segment bounds is unavailable
     public static @Nullable HitResult contact(ServerPlayer player, double range) {
         var start = player.getEyePosition();
         var end = start.add(player.getLookAngle().scale(range));
         var level = player.level();
         if (!LoadedChunks.contains(level, new AABB(start, end))) return null;
+        return contact(player, player, start, end, 0f);
+    }
+
+    /// Returns the nearest eligible entity hit, otherwise the first block/border hit or a native miss.
+    /// Native surface projection preserves thin-cover checks and hits starting inside a target.
+    ///
+    /// @param source entity excluded from the native query and used for block collision context
+    /// @param owner caster whose alliances and PvP permissions filter targets
+    /// @param start segment origin in the source's level
+    /// @param end segment endpoint; callers must check loaded chunks before querying
+    /// @param margin additional entity aim tolerance, in blocks
+    static HitResult contact(Entity source, ServerPlayer owner, Vec3 start, Vec3 end, float margin) {
+        var level = source.level();
         var block = level.clipIncludingBorder(
-                new ClipContext(start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
-        // Native intersection includes rays starting inside an entity.
-        HitResult nearest = block;
-        double distance = Double.POSITIVE_INFINITY;
-        for (var hit : ProjectileUtil.getManyEntityHitResult(
-                level,
-                player,
-                start,
-                block.getLocation(),
-                new AABB(start, block.getLocation()),
-                entity -> entity instanceof LivingEntity living && canAffect(player, living),
-                0f,
-                ClipContext.Block.COLLIDER,
-                true,
-                true)) {
-            double candidate = hit.getLocation().distanceToSqr(start);
-            if (candidate < distance) {
-                nearest = hit;
-                distance = candidate;
-            }
-        }
-        return nearest;
+                new ClipContext(start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, source));
+        var entity = ProjectileUtil.getManyEntityHitResult(
+                        level,
+                        source,
+                        start,
+                        block.getLocation(),
+                        new AABB(start, block.getLocation()).inflate(margin),
+                        candidate -> candidate instanceof LivingEntity living && canAffect(owner, living),
+                        margin,
+                        ClipContext.Block.COLLIDER,
+                        true,
+                        true)
+                .stream()
+                .min(Comparator.comparingDouble(hit -> hit.getLocation().distanceToSqr(start)))
+                .orElse(null);
+        return entity == null ? block : entity;
     }
 
     static void push(LivingEntity target, Vec3 force) {

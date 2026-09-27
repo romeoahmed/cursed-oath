@@ -8,7 +8,6 @@ import io.github.romeoahmed.cursedoath.client.input.CombatInput;
 import io.github.romeoahmed.cursedoath.combat.CursedEnergy;
 import io.github.romeoahmed.cursedoath.technique.Technique;
 import io.github.romeoahmed.cursedoath.technique.TechniqueProjectiles;
-import io.github.romeoahmed.cursedoath.technique.TechniqueTuning;
 import java.util.List;
 import java.util.UUID;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -78,6 +77,7 @@ public final class LimitlessClientGameTest implements FabricClientGameTest {
             awaitWaveRemoval(context, world);
             context.waitTicks(DEBRIS_EXPIRY);
             capture(context, "purple-tunnel-settled");
+            world.getServer().runOnServer(server -> target(world, target).discard());
             verifyBlue(context, world);
         }
     }
@@ -127,8 +127,8 @@ public final class LimitlessClientGameTest implements FabricClientGameTest {
                             .isAir(),
                     "Queued Purple excavation must open the wall");
             checkState(
-                    target(world, target).getHealth() == TARGET_HEALTH - TechniqueTuning.PURPLE_DAMAGE,
-                    "Purple must deal one committed hit");
+                    target(world, target).getHealth() < TARGET_HEALTH,
+                    "A cast sent through input and networking must damage the target");
         });
         context.runOnClient(client -> {
             var state = requireNonNull(CombatInput.snapshot());

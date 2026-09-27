@@ -38,6 +38,9 @@ public record CursedEnergy(int current, int reserved) {
         return (long) startup + release > available() ? null : new CursedEnergy(current - startup, reserved + release);
     }
 
+    /// Deducts a reserved release cost from both the balance and the reservation.
+    ///
+    /// @throws IllegalArgumentException if the cost is negative or exceeds the reservation
     public CursedEnergy release(int cost) {
         requireReserved(cost);
         return new CursedEnergy(current - cost, reserved - cost);
@@ -53,11 +56,17 @@ public record CursedEnergy(int current, int reserved) {
         return new CursedEnergy(current, reserved - cost);
     }
 
+    /// Pays from unreserved energy, returning `null` if it is insufficient.
+    ///
+    /// @throws IllegalArgumentException if the cost is negative
     public @Nullable CursedEnergy spend(int cost) {
         requireNonnegative(cost);
         return cost <= available() ? new CursedEnergy(current - cost, reserved) : null;
     }
 
+    /// Restores energy up to [#CAPACITY], preserving reservations.
+    ///
+    /// @throws IllegalArgumentException if the amount is negative
     public CursedEnergy recover(int amount) {
         requireNonnegative(amount);
         return amount == 0 || current == CAPACITY

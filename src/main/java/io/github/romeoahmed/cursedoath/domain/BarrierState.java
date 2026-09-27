@@ -19,8 +19,7 @@ public final class BarrierState {
     public static void initialize() {}
 
     public static int get(Entity entity) {
-        var state = entity.getAttached(STATE);
-        return state == null ? 0 : state;
+        return entity.getAttachedOrElse(STATE, 0);
     }
 
     public static void update(Entity entity, int value) {

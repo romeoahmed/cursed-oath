@@ -30,6 +30,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+/// Server-thread fixtures whose entities and terrain reservations are released on test completion.
 @NullMarked
 public final class CombatFixtures {
     private CombatFixtures() {}
@@ -43,6 +44,8 @@ public final class CombatFixtures {
         return target;
     }
 
+    /// Creates a survival player with a test connection, without adding it to the level or player list.
+    /// Tests drive its attacks and combat state explicitly; it does not receive ordinary player ticks.
     @SuppressWarnings("ReferenceEquality") // Cancel only this fixture's runtime instance.
     public static ServerPlayer caster(GameTestHelper helper) {
         var cookie = CommonListenerCookie.createInitial(new GameProfile(UUID.randomUUID(), "combat-test"), false);
@@ -105,6 +108,10 @@ public final class CombatFixtures {
         throw new IllegalStateException("Terrain capacity accepted 1,024 simultaneous reservations");
     }
 
+    /// Releases directly, bypassing preparation, qualification, and energy costs.
+    /// Tracks resulting projectiles and terrain for cleanup even if they leave the test structure.
+    ///
+    /// @return terrain reservation, or `null` for a technique without ordinary excavation
     @SuppressWarnings("ReferenceEquality") // Capture instances before an owner is removed or replaced.
     public static TerrainDestruction.@Nullable Work release(
             GameTestHelper helper, ServerPlayer player, Technique technique) {
@@ -117,6 +124,7 @@ public final class CombatFixtures {
         return work;
     }
 
+    /// Creates manually advanced combat state outside [CombatRuntime]'s registry.
     public static Fighter fighter(GameTestHelper helper, ServerPlayer player) {
         var fighter = new Fighter(player);
         TestLifecycle.onFinish(helper, fighter::cancel);

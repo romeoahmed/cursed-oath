@@ -6,7 +6,7 @@ Cursed Oath (咒誓) is a Minecraft 26.3 Fabric combat mod. Read [README](README
 
 Java packages use `io.github.romeoahmed.cursedoath`:
 
-- `src/main/java/`: common combat, techniques, domains, terrain, networking, commands, and mixins.
+- `src/main/java/`: common combat, techniques, domains, collision geometry, terrain, networking, commands, and mixins.
 - `src/client/java/`: input, GUI, animation, rendering, sound, and client mixins.
 - `src/main/resources/`: metadata, icon, Mixin configuration, and server data.
 - `src/client/resources/`: translations and audiovisual assets.
@@ -19,11 +19,13 @@ Use JDK 25 and the repository wrapper (`gradlew.bat` on Windows).
 
 - `./gradlew genSources`: inspect generated targets before version-sensitive changes.
 - `./gradlew spotlessApply`: format Java and normalize text; run separately before checks.
-- `./gradlew build`: compile, check formatting and static analysis, run unit/server tests and coverage, package JARs.
+- `./gradlew build`: compile, check formatting and static analysis, validate Javadoc, run unit/server tests and coverage, package JARs.
 - `./gradlew runClientGameTest`: run the complete Vulkan suite after `build`; requires a graphics session. The preflight and suite reject backend fallback.
 - `./gradlew test --tests '*ClassName'` or `./gradlew runGameTest`: focused verification.
 
-Inspect `build/run/clientGameTest/screenshots/`; preserve captures before server tests, whose cleanup can delete them. Pixel assertions cannot establish visual quality. For documentation or comment-only changes, run formatting and link checks instead of game tests. Validate edited Javadoc with the JDK 25 standard doclet, including private declarations and reference checks. Report checks actually performed.
+Inspect `build/run/clientGameTest/screenshots/`; preserve captures before server tests, whose cleanup can delete them. Pixel assertions cannot establish visual quality.
+
+For documentation or comment-only changes, run `spotlessApply`, then `spotlessCheck javadoc`, and check local links and anchors. Javadoc validates main/client comments with the JDK 25 standard doclet, including private declarations and references. Game tests are unnecessary when behavior is unchanged. Report only checks actually performed.
 
 ## Code and tests
 
@@ -35,6 +37,6 @@ Test behavior and boundary cases. Use scoped fixtures with completion cleanup, n
 
 ## Text and contributions
 
-Keep three-language keys and placeholders aligned; follow [terminology](docs/localization.zh-CN.md). Separate implementation, plans, and canon evidence. Use `///` Javadoc for declaration contracts: summarize the behavior, then document non-obvious units, ownership, null results, or side effects. Use `//` for local reasoning. Do not add boilerplate for self-explanatory declarations or repeat the implementation.
+Keep three-language keys and placeholders aligned; follow [terminology](docs/localization.zh-CN.md). Separate implementation, plans, and canon evidence. Use `///` for declaration contracts and `//` for local reasoning; follow the [comment conventions](CONTRIBUTING.md#comments-and-documentation). Verify comments against callers and implementations, particularly units, ownership, callback timing, and cancellation. Remove obsolete explanations without adding boilerplate to self-explanatory declarations.
 
 Use concise, imperative Conventional Commits. PRs explain behavior and validation, link relevant issues, and include screenshots for visual changes. Exclude builds, caches, and run directories.

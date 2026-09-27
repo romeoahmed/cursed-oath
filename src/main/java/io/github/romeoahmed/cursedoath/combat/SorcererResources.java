@@ -3,7 +3,8 @@ package io.github.romeoahmed.cursedoath.combat;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
-/// Balance, recovery, and burnout persist; active casts and reservations do not.
+/// Persistent energy and remaining recovery/burnout ticks; active casts and reservations are transient.
+/// Timers advance only while the player's combat state ticks, not while offline.
 public record SorcererResources(int energy, int recovery, int burnout) {
     public SorcererResources() {
         this(CursedEnergy.CAPACITY, 0, 0);

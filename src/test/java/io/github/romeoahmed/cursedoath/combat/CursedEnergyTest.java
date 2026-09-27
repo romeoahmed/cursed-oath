@@ -26,15 +26,8 @@ class CursedEnergyTest {
         assertNull(prepared.spend(1));
         assertEquals(prepared, prepared.spend(0));
         assertEquals(new CursedEnergy(0), prepared.release(90));
-        assertEquals(new CursedEnergy(90), prepared.cancel(90));
-    }
-
-    @Test
-    void cancellationReleasesReservationWithoutRefundingStartup() {
-        var prepared = new CursedEnergy(100).prepare(10, 70);
-        assertNotNull(prepared);
-        assertEquals(new CursedEnergy(90), prepared.cancel(70));
-        assertThrows(IllegalArgumentException.class, () -> prepared.cancel(71));
+        assertEquals(new CursedEnergy(90), prepared.cancel(90), "Cancellation retains the paid startup cost");
+        assertThrows(IllegalArgumentException.class, () -> prepared.cancel(91));
     }
 
     @Test

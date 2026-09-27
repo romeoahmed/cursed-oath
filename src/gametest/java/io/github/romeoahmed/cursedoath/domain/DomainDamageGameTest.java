@@ -56,7 +56,7 @@ public final class DomainDamageGameTest {
             return true;
         });
         try {
-            Domains.tick();
+            Domains.tick(helper.getLevel().getServer());
             helper.assertTrue(hits[0] == 1, "Transferred players must leave the sure-hit batch; hits=" + hits[0]);
         } finally {
             for (var target : targets) target.setServerLevel(level);
@@ -76,7 +76,7 @@ public final class DomainDamageGameTest {
         victim.setItemInHand(InteractionHand.MAIN_HAND, Items.APPLE.getDefaultInstance());
         victim.startUsingItem(InteractionHand.MAIN_HAND);
         Domains.open(caster, Technique.UNLIMITED_VOID);
-        Domains.tick();
+        Domains.tick(helper.getLevel().getServer());
         helper.assertTrue(Domains.isOverloaded(victim) && !victim.isUsingItem(), "Overload interrupts native item use");
         var before = target.getHealth();
         victim.attack(target);
@@ -84,7 +84,7 @@ public final class DomainDamageGameTest {
         fighter.prepare(Technique.BLUE);
         helper.assertTrue(fighter.cast() == null, "Overload prevents casting");
         victim.setGameMode(GameType.SPECTATOR);
-        Domains.tick();
+        Domains.tick(helper.getLevel().getServer());
         helper.assertTrue(!Domains.isOverloaded(victim), "A spectator camera must not be controlled by sure hits");
         helper.succeed();
     }

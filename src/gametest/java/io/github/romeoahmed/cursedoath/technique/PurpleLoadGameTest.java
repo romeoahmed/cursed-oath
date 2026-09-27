@@ -1,7 +1,6 @@
 package io.github.romeoahmed.cursedoath.technique;
 
 import static io.github.romeoahmed.cursedoath.CombatFixtures.*;
-import static io.github.romeoahmed.cursedoath.TestLifecycle.*;
 import static java.util.Objects.requireNonNull;
 
 import io.github.romeoahmed.cursedoath.world.TerrainDestruction;

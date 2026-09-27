@@ -61,7 +61,7 @@ public final class DomainGameTest {
         var inside = stationaryTarget(helper, EntityTypes.VILLAGER, new BlockPos(14, 23, 14));
         var outside = stationaryTarget(helper, EntityTypes.VILLAGER, corner.above());
         Domains.open(caster, Technique.MALEVOLENT_SHRINE);
-        Domains.tick();
+        Domains.tick(helper.getLevel().getServer());
         helper.assertTrue(inside.getHealth() < inside.getMaxHealth(), "Sure hits extend vertically inside the sphere");
         helper.assertTrue(outside.getHealth() == outside.getMaxHealth(), "Sphere corners cannot receive sure hits");
         helper.succeedWhen(() -> {
@@ -82,7 +82,7 @@ public final class DomainGameTest {
             if (source.getDirectEntity() == domain) Domains.end(domain);
             return true;
         });
-        Domains.tick();
+        Domains.tick(helper.getLevel().getServer());
         helper.assertTrue(domain.isRemoved(), "The damage callback must collapse the anchor");
         helper.assertTrue(
                 targets.stream()
@@ -112,7 +112,7 @@ public final class DomainGameTest {
             }
             return true;
         });
-        Domains.tick();
+        Domains.tick(helper.getLevel().getServer());
         helper.assertTrue(relocated.get(), "The first hit must invoke the relocation callback");
         helper.assertTrue(
                 targets.stream()
@@ -134,12 +134,12 @@ public final class DomainGameTest {
         target.setPos(caster.position());
         Domains.open(caster, Technique.UNLIMITED_VOID);
         try {
-            Domains.tick();
+            Domains.tick(helper.getLevel().getServer());
             helper.assertTrue(!Domains.isOverloaded(target), "Contact exempts the target");
             helper.assertTrue(
                     fighter.defense().simple() == Defense.SIMPLE_STRENGTH, "An exempt target exerts no pressure");
             target.setPos(caster.position().add(0.0, 0.0, 2.0));
-            Domains.tick();
+            Domains.tick(helper.getLevel().getServer());
             helper.assertTrue(
                     fighter.defense().simple() == Defense.SIMPLE_STRENGTH - 1, "Breaking contact resumes pressure");
         } finally {
@@ -153,7 +153,7 @@ public final class DomainGameTest {
         var caster = caster(helper);
         var target = stationaryTarget(helper, EntityTypes.HUSK, new BlockPos(2, 1, 6));
         var domain = Domains.open(caster, Technique.UNLIMITED_VOID);
-        Domains.tick();
+        Domains.tick(helper.getLevel().getServer());
         helper.assertTrue(Domains.isOverloaded(target), "Void must apply its own control state");
         var position = target.position();
         target.move(MoverType.SELF, new Vec3(1.0, 0.0, 0.0));
@@ -176,7 +176,7 @@ public final class DomainGameTest {
         var shrine = Domains.open(second, Technique.MALEVOLENT_SHRINE);
         var extra = Domains.open(third, Technique.UNLIMITED_VOID);
         var health = target.getHealth();
-        Domains.tick();
+        Domains.tick(helper.getLevel().getServer());
         helper.assertTrue(
                 !Domains.isOverloaded(target) && target.getHealth() == health, "Resolve all overlaps before hits");
         helper.assertTrue(
@@ -184,7 +184,7 @@ public final class DomainGameTest {
                 "A third caster has no artificial domain cap");
         Domains.end(shrine);
         Domains.end(extra);
-        Domains.tick();
+        Domains.tick(helper.getLevel().getServer());
         helper.assertTrue(Domains.isOverloaded(target), "The remaining uncontested domain must resume");
         helper.succeed();
     }
@@ -197,7 +197,7 @@ public final class DomainGameTest {
         var reservations = saturateTerrain(helper, caster);
         try {
             Domains.open(caster, Technique.MALEVOLENT_SHRINE);
-            Domains.tick();
+            Domains.tick(helper.getLevel().getServer());
             helper.assertTrue(
                     target.getHealth() < target.getMaxHealth(),
                     "Sure hits are independent of cover and terrain capacity");
@@ -220,14 +220,14 @@ public final class DomainGameTest {
         stationaryTarget(helper, EntityTypes.HUSK, new BlockPos(3, 1, 6));
         Domains.open(caster, Technique.UNLIMITED_VOID);
         try {
-            Domains.tick();
-            Domains.tick();
+            Domains.tick(helper.getLevel().getServer());
+            Domains.tick(helper.getLevel().getServer());
             helper.assertTrue(!Domains.isOverloaded(target), "Simple Domain must protect its spatial occupants");
             helper.assertTrue(
                     fighter.defense().simple() == 99,
                     "Extra targets and duplicate same-tick checks must not multiply erosion");
             fighter.prepare(Technique.SIMPLE_DOMAIN);
-            Domains.tick();
+            Domains.tick(helper.getLevel().getServer());
             helper.assertTrue(Domains.isOverloaded(target), "Losing protection must expose the target");
         } finally {
             CombatRuntime.practice(defender, false);
@@ -264,7 +264,7 @@ public final class DomainGameTest {
         helper.assertTrue(
                 Domains.inLevel(helper.getLevel()).contains(domain),
                 "Native load indexes the anchor before its first tick");
-        Domains.tick();
+        Domains.tick(helper.getLevel().getServer());
         helper.assertTrue(Domains.isOverloaded(target), "Target begins controlled");
         domain.setRemoved(Entity.RemovalReason.UNLOADED_TO_CHUNK);
         helper.assertTrue(!Domains.isOverloaded(target), "Native unload clears control immediately");
@@ -308,7 +308,7 @@ public final class DomainGameTest {
         requireNonNull(target.getAttribute(Attributes.MAX_HEALTH)).setBaseValue(200);
         target.setHealth(200);
         Domains.open(caster, Technique.MALEVOLENT_SHRINE);
-        Domains.tick();
+        Domains.tick(helper.getLevel().getServer());
         helper.assertTrue(target.getHealth() == 40, "Cleave adapts to durability up to its 160-point limit");
         helper.succeed();
     }

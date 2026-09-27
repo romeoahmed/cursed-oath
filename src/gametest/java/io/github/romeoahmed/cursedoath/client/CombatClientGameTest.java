@@ -157,9 +157,7 @@ public final class CombatClientGameTest implements FabricClientGameTest {
     }
 
     private static void verifyInfinity(ClientGameTestContext context, TestSingleplayerContext world) {
-        for (int index = 0; index < Technique.values().length; index++)
-            if (context.computeOnClient(client -> CombatInput.selected() != Technique.INFINITY))
-                context.getInput().pressKey(CombatInput.SELECT);
+        context.runOnClient(client -> CombatInput.choose(Technique.INFINITY));
         context.getInput().pressKey(CombatInput.CAST);
         context.waitFor(client ->
                 CombatInput.snapshot() != null && CombatInput.snapshot().infinity());
@@ -177,8 +175,7 @@ public final class CombatClientGameTest implements FabricClientGameTest {
         context.getInput().pressKey(CombatInput.CANCEL);
         context.waitFor(client ->
                 CombatInput.snapshot() != null && !CombatInput.snapshot().infinity());
-        context.getInput().pressKey(CombatInput.SELECT);
-        context.runOnClient(client -> checkState(CombatInput.selected() == Technique.BLUE));
+        context.runOnClient(client -> CombatInput.choose(Technique.BLUE));
         world.getServer().runCommand("execute as @a run cursedoath practice");
         world.getConnection().waitForClientboundPackets();
     }

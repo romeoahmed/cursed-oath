@@ -4,7 +4,7 @@ import io.github.romeoahmed.cursedoath.technique.Technique;
 import io.github.romeoahmed.cursedoath.technique.TechniqueTuning;
 import net.minecraft.world.phys.Vec3;
 
-final class TechniqueGeometry {
+final class CombatEffects {
     private static final double HEAL_RADIUS = 0.6, DETAIL_DISTANCE_SQUARED = 48.0 * 48.0;
     private static final int POINTS = 17;
     private static final int GRID = TechniqueTuning.CLEAVE_GRID;
@@ -33,7 +33,7 @@ final class TechniqueGeometry {
 
     private final EffectMesh mesh;
 
-    TechniqueGeometry(EffectMesh mesh) {
+    CombatEffects(EffectMesh mesh) {
         this.mesh = mesh;
     }
 

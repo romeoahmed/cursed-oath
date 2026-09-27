@@ -1,7 +1,6 @@
 package io.github.romeoahmed.cursedoath.technique;
 
 import static io.github.romeoahmed.cursedoath.CombatFixtures.*;
-import static io.github.romeoahmed.cursedoath.TestLifecycle.*;
 
 import io.github.romeoahmed.cursedoath.combat.CombatRuntime;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;

@@ -1,12 +1,11 @@
 package io.github.romeoahmed.cursedoath.domain;
 
 import static io.github.romeoahmed.cursedoath.CombatFixtures.*;
-import static io.github.romeoahmed.cursedoath.TestLifecycle.*;
 import static java.util.Objects.requireNonNull;
 
+import io.github.romeoahmed.cursedoath.geometry.SweptVolume;
 import io.github.romeoahmed.cursedoath.technique.CleaveContact;
 import io.github.romeoahmed.cursedoath.technique.Technique;
-import io.github.romeoahmed.cursedoath.world.SweptVolume;
 import java.util.HashSet;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;

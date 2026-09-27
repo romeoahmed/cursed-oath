@@ -1,8 +1,8 @@
 package io.github.romeoahmed.cursedoath.technique;
 
 import io.github.romeoahmed.cursedoath.domain.DomainInteractions;
+import io.github.romeoahmed.cursedoath.geometry.SweptVolume;
 import io.github.romeoahmed.cursedoath.world.LoadedChunks;
-import io.github.romeoahmed.cursedoath.world.SweptVolume;
 import io.github.romeoahmed.cursedoath.world.TerrainDestruction;
 import java.util.HashSet;
 import java.util.Set;

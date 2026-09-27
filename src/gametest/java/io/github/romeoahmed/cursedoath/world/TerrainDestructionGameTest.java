@@ -7,6 +7,7 @@ import static java.util.Objects.requireNonNull;
 import io.github.romeoahmed.cursedoath.combat.CursedEnergy;
 import io.github.romeoahmed.cursedoath.combat.SorcererAttachments;
 import io.github.romeoahmed.cursedoath.combat.SorcererProfile;
+import io.github.romeoahmed.cursedoath.geometry.SweptVolume;
 import io.github.romeoahmed.cursedoath.technique.Technique;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -156,14 +157,15 @@ public final class TerrainDestructionGameTest {
     }
 
     @GameTest(environment = "cursed-oath-test:terrain", structure = "cursed-oath-test:arena", maxTicks = 100)
-    public void protectedBlockDoesNotCancelTheRestOfASphere(GameTestHelper helper) {
+    public void queuedSphereRechecksChangedBlocksAndContinuesPastProtectedOnes(GameTestHelper helper) {
         var player = caster(helper);
         var center = new BlockPos(8, 6, 10);
         var stone = center.east(2);
-        helper.setBlock(center, Blocks.CHEST);
+        helper.setBlock(center, Blocks.STONE);
         helper.setBlock(stone, Blocks.STONE);
         var work = requireNonNull(reserveTerrain(helper, player));
         work.sphere(Vec3.atCenterOf(helper.absolutePos(center)), 4.0);
+        helper.setBlock(center, Blocks.CHEST);
         helper.succeedWhen(() -> {
             helper.assertTrue(work.finished(), "Excavation must settle");
             helper.assertBlockPresent(Blocks.CHEST, center);

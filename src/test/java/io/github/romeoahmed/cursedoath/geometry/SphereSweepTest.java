@@ -1,4 +1,4 @@
-package io.github.romeoahmed.cursedoath.world;
+package io.github.romeoahmed.cursedoath.geometry;
 
 import static org.junit.jupiter.api.Assertions.*;
 

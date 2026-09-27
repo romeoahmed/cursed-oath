@@ -1,6 +1,7 @@
 package io.github.romeoahmed.cursedoath.technique;
 
-/// Game units: Red peak damage is twice the sum of Blue's six pulses.
+/// Game tuning in blocks, server ticks, and pre-mitigation health points; speeds are blocks per tick.
+/// Red's peak damage is twice Blue's total scheduled pulse damage.
 public final class TechniqueTuning {
     private TechniqueTuning() {}
 
@@ -19,6 +20,7 @@ public final class TechniqueTuning {
     public static final double PURPLE_RANGE = 128.0;
     public static final double PURPLE_SPEED = 4.0;
     public static final float DISMANTLE_DAMAGE = 36f;
+    /// Half-width of Dismantle's cutting volume.
     public static final double DISMANTLE_WIDTH = 5.0;
     public static final double DISMANTLE_RANGE = 48.0;
     public static final float CLEAVE_DAMAGE = 64f;
@@ -35,6 +37,4 @@ public final class TechniqueTuning {
             default -> 0.0;
         };
     }
-
-    public static final float FUSION_CONTACT = 0.65f;
 }
