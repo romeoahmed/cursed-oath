@@ -25,6 +25,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContex
 import net.minecraft.client.CameraType;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.core.BlockPos;
 import net.minecraft.util.ARGB;
 import org.jspecify.annotations.NullMarked;
 
@@ -37,6 +38,9 @@ public final class RenderClientGameTest implements FabricClientGameTest {
             EFFECT_AGE = 3,
             CHARGE_SAMPLE = 3,
             EFFECT_EXPIRY = 20;
+    private static final List<BlockPos> GLASS_SECTIONS = List.of(
+            new BlockPos(-6, -55, 6), new BlockPos(-6, -44, 6),
+            new BlockPos(6, -55, 6), new BlockPos(6, -44, 6));
     private static final float VERTICAL_PITCH = 90;
     private static final double VERTICAL_DISTANCE = 4, EFFECT_DISTANCE = 12, CHARGE_DISTANCE = 2, FUSION_DISTANCE = 5;
     private static final List<Integer> FUSION_AGES = List.of(0, 4, 8, 16, 24, 28, 31, 34, 38, 44, 49),
@@ -62,7 +66,7 @@ public final class RenderClientGameTest implements FabricClientGameTest {
             captureLanguages(context);
             world.getServer().runCommand("gamemode spectator @a");
             world.getConnection().waitForClientboundPackets();
-            captureEffects(context);
+            captureEffects(context, world);
             captureTransparency(context, world);
             world.getServer().runCommand("gamemode creative @a");
             world.getServer().runOnServer(server -> {
@@ -167,28 +171,37 @@ public final class RenderClientGameTest implements FabricClientGameTest {
         context.waitFor(client -> client.gui.overlay() == null);
     }
 
-    private static void captureEffects(ClientGameTestContext context) {
+    private static void captureEffects(ClientGameTestContext context, TestSingleplayerContext world) {
         var hidden = context.computeOnClient(client -> client.gui.hud.isHidden());
         try {
             if (!hidden) context.getInput().pressKey(options -> options.keyToggleGui);
             for (var technique : List.of(Technique.BLUE, Technique.RED, Technique.PURPLE))
                 verifyEffect(
                         context,
+                        world,
                         new Effect(
                                 technique, TechniqueEvent.PREPARE, technique.preparation() / CHARGE_SAMPLE, 0, false),
                         true);
             for (int age : FUSION_AGES)
-                verifyEffect(context, new Effect(Technique.PURPLE, TechniqueEvent.PREPARE, age, 0, false), false);
+                verifyEffect(
+                        context, world, new Effect(Technique.PURPLE, TechniqueEvent.PREPARE, age, 0, false), false);
             for (int age : List.of(24, 32, 40))
-                verifyEffect(context, new Effect(Technique.PURPLE, TechniqueEvent.PREPARE, age, 0, false), false, 60);
+                verifyEffect(
+                        context, world, new Effect(Technique.PURPLE, TechniqueEvent.PREPARE, age, 0, false), false, 60);
             for (var technique : List.of(Technique.HEAL, Technique.RED, Technique.CLEAVE))
-                verifyEffect(context, new Effect(technique), true);
-            verifyEffect(context, new Effect(Technique.CLEAVE, TechniqueEvent.RELEASE, EFFECT_AGE, 0, true), true);
+                verifyEffect(context, world, new Effect(technique), true);
+            verifyEffect(
+                    context, world, new Effect(Technique.CLEAVE, TechniqueEvent.RELEASE, EFFECT_AGE, 0, true), true);
             verifyEffect(
                     context,
+                    world,
                     new Effect(Technique.CLEAVE, TechniqueEvent.RELEASE, EFFECT_AGE, VERTICAL_PITCH, false),
                     true);
-            verifyEffect(context, new Effect(Technique.CLEAVE, TechniqueEvent.BLACK_FLASH, EFFECT_AGE, 0, false), true);
+            verifyEffect(
+                    context,
+                    world,
+                    new Effect(Technique.CLEAVE, TechniqueEvent.BLACK_FLASH, EFFECT_AGE, 0, false),
+                    true);
         } finally {
             context.runOnClient(client -> {
                 if (client.gui.hud.isHidden() != hidden) client.gui.hud.toggle();
@@ -211,7 +224,12 @@ public final class RenderClientGameTest implements FabricClientGameTest {
             for (boolean improved : List.of(false, true)) {
                 context.runOnClient(
                         client -> client.options.improvedTransparency().set(improved));
-                context.waitTicks(2);
+                // Changing OIT invalidates compiled terrain on the next extraction.
+                context.waitTick();
+                world.getConnection().waitForChunksRender();
+                // In 26.3 an empty build queue can precede scheduling every visible section.
+                context.waitFor(client -> GLASS_SECTIONS.stream()
+                        .allMatch(pos -> client.levelRenderer.isSectionCompiledAndVisible(pos, 0)));
                 var baseline = capture(context, "glass-background-" + improved);
                 var event = context.computeOnClient(client -> {
                     var player = requireNonNull(client.player);
@@ -261,7 +279,12 @@ public final class RenderClientGameTest implements FabricClientGameTest {
                     if (radiusSquared >= 400 && (radiusSquared < inner || radiusSquared > outer)) continue;
                     int expected = before.getPixel(x, y), observed = after.getPixel(x, y);
                     if (radiusSquared < 400) {
-                        if (Math.abs(ARGB.blue(observed) - ARGB.blue(expected)) > 40) body++;
+                        if (Math.max(
+                                        Math.abs(ARGB.red(observed) - ARGB.red(expected)),
+                                        Math.max(
+                                                Math.abs(ARGB.green(observed) - ARGB.green(expected)),
+                                                Math.abs(ARGB.blue(observed) - ARGB.blue(expected))))
+                                > 40) body++;
                         continue;
                     }
                     if (ARGB.green(expected) <= ARGB.red(expected) + 8
@@ -270,10 +293,13 @@ public final class RenderClientGameTest implements FabricClientGameTest {
                     // Blue glow adds negligible red here; a missing glass layer exposes the pale wall.
                     if (ARGB.red(observed) - ARGB.red(expected) > 20) missing++;
                 }
-            checkState(body > 100, "The glass comparison must include a visible energy body");
+            checkState(samples > 100, "The baseline must contain rendered glass; samples=%s", samples);
+            checkState(body > 100, "The glass comparison must include a visible energy body; pixels=%s", body);
             checkState(
-                    samples > 100 && missing < samples / 100,
-                    "Transparent glow must not erase the stained glass behind it");
+                    missing < samples / 100,
+                    "Transparent glow must not erase the stained glass behind it; missing=%s/%s",
+                    missing,
+                    samples);
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
@@ -296,11 +322,17 @@ public final class RenderClientGameTest implements FabricClientGameTest {
         }
     }
 
-    private static void verifyEffect(ClientGameTestContext context, Effect effect, boolean verifyExpiry) {
-        verifyEffect(context, effect, verifyExpiry, 0);
+    private static void verifyEffect(
+            ClientGameTestContext context, TestSingleplayerContext world, Effect effect, boolean verifyExpiry) {
+        verifyEffect(context, world, effect, verifyExpiry, 0);
     }
 
-    private static void verifyEffect(ClientGameTestContext context, Effect effect, boolean verifyExpiry, int angle) {
+    private static void verifyEffect(
+            ClientGameTestContext context,
+            TestSingleplayerContext world,
+            Effect effect,
+            boolean verifyExpiry,
+            int angle) {
         var technique = effect.technique();
         int stage = effect.stage(), age = effect.age();
         float pitch = effect.pitch();
@@ -312,42 +344,50 @@ public final class RenderClientGameTest implements FabricClientGameTest {
                 : technique.name().toLowerCase(Locale.ROOT);
         var name = label + "-" + (int) pitch + "-" + (reverse ? "back" : "front") + "-" + stage + "-" + age
                 + (angle == 0 ? "" : "-oblique");
-        var baseline = capture(context, name + "-before");
-        var event = context.computeOnClient(client -> {
-            var player = requireNonNull(client.player);
-            var level = requireNonNull(client.level);
-            var direction = player.getLookAngle();
-            var destination = player.getEyePosition().add(direction.scale(effect.distance()));
-            // A successful contact may start inside the target; zero separation is not a miss.
-            var origin = angle != 0
-                    ? destination.subtract(direction.yRot((float) Math.toRadians(angle)))
-                    : reverse
-                            ? destination.add(direction)
-                            : technique == Technique.CLEAVE && stage != TechniqueEvent.BLACK_FLASH && pitch == 0
-                                    ? destination
-                                    : player.getEyePosition();
-            return new TechniqueEvent(
-                    level.dimension().identifier(),
-                    UUID.randomUUID(),
-                    -1,
-                    technique.wireId(),
-                    stage,
-                    level.getGameTime() - age,
-                    origin,
-                    destination);
-        });
-        context.runOnClient(client -> TechniqueVisuals.accept(event));
+        // Screenshot readback can tick the game; freeze the phase, not only the partial tick.
+        world.getServer().runCommand("tick freeze");
+        world.getConnection().waitForClientboundPackets();
         try {
-            checkEffect(context, baseline, name, true);
-            if (technique == Technique.PURPLE && stage == TechniqueEvent.PREPARE && age == 31 && angle == 0)
-                checkFusionColors(context);
-            if (verifyExpiry) {
-                int lifetime = stage == TechniqueEvent.PREPARE ? technique.preparation() : EFFECT_EXPIRY;
-                context.waitTicks(Math.max(lifetime - age + 2, 1));
-                checkEffect(context, baseline, name + "-expired", false);
+            var baseline = capture(context, name + "-before");
+            var event = context.computeOnClient(client -> {
+                var player = requireNonNull(client.player);
+                var level = requireNonNull(client.level);
+                var direction = player.getLookAngle();
+                var destination = player.getEyePosition().add(direction.scale(effect.distance()));
+                // A successful contact may start inside the target; zero separation is not a miss.
+                var origin = angle != 0
+                        ? destination.subtract(direction.yRot((float) Math.toRadians(angle)))
+                        : reverse
+                                ? destination.add(direction)
+                                : technique == Technique.CLEAVE && stage != TechniqueEvent.BLACK_FLASH && pitch == 0
+                                        ? destination
+                                        : player.getEyePosition();
+                return new TechniqueEvent(
+                        level.dimension().identifier(),
+                        UUID.randomUUID(),
+                        -1,
+                        technique.wireId(),
+                        stage,
+                        level.getGameTime() - age,
+                        origin,
+                        destination);
+            });
+            context.runOnClient(client -> TechniqueVisuals.accept(event));
+            try {
+                if (technique == Technique.PURPLE && stage == TechniqueEvent.PREPARE && age == 31 && angle == 0)
+                    checkFusionColors(capture(context, name));
+                else checkEffect(context, baseline, name, true);
+                if (verifyExpiry) {
+                    int lifetime = stage == TechniqueEvent.PREPARE ? technique.preparation() : EFFECT_EXPIRY;
+                    world.getServer().runCommand("tick unfreeze");
+                    context.waitFor(client -> requireNonNull(client.level).getGameTime() - event.tick() > lifetime);
+                    checkEffect(context, baseline, name + "-expired", false);
+                }
+            } finally {
+                if (stage == TechniqueEvent.PREPARE) cancelEffect(context, event);
             }
         } finally {
-            if (stage == TechniqueEvent.PREPARE) cancelEffect(context, event);
+            world.getServer().runCommand("tick unfreeze");
         }
     }
 
@@ -363,8 +403,7 @@ public final class RenderClientGameTest implements FabricClientGameTest {
                 event.destination())));
     }
 
-    private static void checkFusionColors(ClientGameTestContext context) {
-        var screenshot = capture(context, "purple-overlap-colors");
+    private static void checkFusionColors(Path screenshot) {
         try (var image = NativeImage.read(Files.readAllBytes(screenshot))) {
             int blue = 0, red = 0, purple = 0;
             for (int y = image.getHeight() / 3; y < image.getHeight() * 2 / 3; y++)
